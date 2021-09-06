@@ -1,5 +1,5 @@
-.idea
-summary
+.idea/
+summary/
 
 create_maze_test.py
 
