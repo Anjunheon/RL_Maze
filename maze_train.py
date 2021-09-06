@@ -31,22 +31,22 @@ def make(prev, room, _maze, _rsize, _csize):
 
     room.visit = 1
     mazeMap[(room.r + 1) * 2 - 1][(room.c + 1) * 2 - 1] = 0
-    print('\n현재좌표: {0},{1}'.format(room.r, room.c))
+    # print('\n현재좌표: {0},{1}'.format(room.r, room.c))
 
     while True:
         if len(room.drct) == 0:
             break
         nr, nc = room.drct.pop()
-        print('좌표체크: {0},{1}'.format(nr, nc))
+        # print('좌표체크: {0},{1}'.format(nr, nc))
 
         if nr >= 0 and nr < _rsize and nc >= 0 and nc < _csize:
             if not _maze[nr][nc].visit == 1:
-                print('{0},{1} 좌표로 진행'.format(nr, nc))
+                # print('{0},{1} 좌표로 진행'.format(nr, nc))
                 make(room, _maze[nr][nc], _maze, _rsize, _csize)
             else:
-                print('방문기록있음')
+                print('방문기록있음\b\b\b\b\b\b\b', end='')
         else:
-            print('진행불가')
+            print('진행불가\b\b\b\b\b\b\b\b\b\b', end='')
 
 
 def make_maze():
@@ -55,8 +55,8 @@ def make_maze():
 
     maze = [[Room(r, c) for c in range(csize)] for r in range(rsize)]
     mazeMap = [[1 for c in range(csize * 2 + 1)] for r in range(rsize * 2 + 1)]
-    print(np.shape(maze))
-    print(np.shape(mazeMap))
+    # print(np.shape(maze))
+    # print(np.shape(mazeMap))
 
     make(None, maze[0][0], maze, rsize, csize)
 
@@ -358,7 +358,7 @@ def generate():
                 label.place(x=j*50+10, y=i*50+10)
                 label.configure()
 
-    img = tkinter.PhotoImage(file='player.png').subsample(5)
+    img = tkinter.PhotoImage(file='player.png').subsample(6)
     img.zoom(50, 50)
 
     canvas.create_image(posX * 50 + 25, posY * 50 + 25, image=img, tag='player')
