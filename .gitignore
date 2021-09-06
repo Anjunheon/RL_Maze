@@ -1,0 +1,9 @@
+.idea/
+summary/
+
+create_maze_test.py
+
+maze.txt
+
+*.iml
+*.xml
