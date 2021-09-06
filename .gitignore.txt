@@ -1,5 +1,10 @@
 .idea/
 summary/
+.idea/.gitignore
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/maze.iml
+.idea/misc.xml
+.idea/modules.xml
 
 create_maze_test.py
 
