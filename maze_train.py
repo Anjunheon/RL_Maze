@@ -49,6 +49,47 @@ def make(prev, room, _maze, _rsize, _csize):
             print('진행불가')
 
 
+def make_maze():
+    global maze, mazeMap
+    global rsize, csize
+
+    maze = [[Room(r, c) for c in range(csize)] for r in range(rsize)]
+    mazeMap = [[1 for c in range(csize * 2 + 1)] for r in range(rsize * 2 + 1)]
+    print(np.shape(maze))
+    print(np.shape(mazeMap))
+
+    make(None, maze[0][0], maze, rsize, csize)
+
+    while True:
+        r = random.randint(1, rsize * 2)
+        if mazeMap[r][-2] == 1:
+            continue
+        mazeMap[r][-1] = 2
+        break
+
+
+def reset_game():
+    global tk, canvas
+    global posX, posY
+    global maze, mazeMap
+    global done
+
+    # tk.destroy()
+
+    posX = 1
+    posY = 0
+
+    maze = []
+    # mazeMap = []
+
+    done = False
+
+    # make_maze()
+    # generate()
+
+    tk.update()
+
+
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
@@ -110,12 +151,12 @@ class DQNAgent:
         if np.random.rand() <= self.epsilon:
             return random.randint(0, self.action_size-1)
         else:
-            q_value = self.model(history)
+            q_value = self.model.call(history)
             return np.argmax(q_value[0])
 
     # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장
-    def append_sample(self, history, action, reward, next_history):
-        self.memory.append((history, action, reward, next_history))
+    def append_sample(self, history, action, reward, next_history, done):
+        self.memory.append((history, action, reward, next_history, done))
 
     # 텐서보드에 학습 정보를 기록
     def draw_tensorboard(self, score, step, episode):
@@ -147,12 +188,12 @@ class DQNAgent:
         model_params = self.model.trainable_variables
         with tf.GradientTape() as tape:
             # 현재 상태에 대한 모델의 큐함수
-            predicts = self.model(history)
+            predicts = self.model.call(history)
             one_hot_action = tf.one_hot(actions, self.action_size)
             predicts = tf.reduce_sum(one_hot_action * predicts, axis=1)
 
             # 다음 상태에 대한 타깃 모델의 큐함수
-            target_predicts = self.target_model(next_history)
+            target_predicts = self.target_model.call(next_history)
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
             max_q = np.amax(target_predicts, axis=1)
@@ -177,6 +218,7 @@ def move():
     global posX, posY
     global tk, canvas
     global mazeMap
+    global done
 
     global_step = 0
     score_avg = 0
@@ -186,7 +228,7 @@ def move():
     action_dict = {0: 1, 1: 2, 2: 3, 3: 3}
 
     num_episode = 50000
-    for e in range(num_episode):
+    for e in range(0, num_episode):
         reward = 0
         done = False
 
@@ -196,9 +238,7 @@ def move():
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
         state = [posX, posY]
-        # history = np.stack((state, state, state, state), axis=2)
-        # history = np.reshape([history], (1, (2, 2), 4))
-        history = np.array([state, state, state, state])
+        history = np.float32([state, state, state, state])
 
         while not done:
             global_step += 1
@@ -232,28 +272,25 @@ def move():
 
             time.sleep(0.05)
 
-            print(posY, posX)
-            print(mazeMap[posY][posX])
+            # print(posY, posX)
+            # print(mazeMap[posY][posX])
 
             if mazeMap[posY][posX] == 2:
-                print('Goal!')
+                # print('Goal!')
                 done = True
                 reward = 1
-                # reset_game()
 
             # 각 타임스텝마다 상태 전처리
             next_state = [posY, posX]
-            # next_state = np.reshape([next_state], (1, state_size))
-            print(history[0])
-            next_history = [next_state, history[0], history[1], history[2]]
-            print(next_history)
 
-            agent.avg_q_max += np.amax(agent.model([history[0]]))
+            next_history = np.float32([next_state, history[0], history[1], history[2]])
+
+            agent.avg_q_max += np.amax(agent.model.call(np.float32([history[0]])))
 
             score += reward
             reward = np.clip(reward, -1., 1.)
             # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장 후 학습
-            agent.append_sample(history, action, reward, next_history)
+            agent.append_sample(history, action, reward, next_history, done)
 
             # 리플레이 메모리 크기가 정해놓은 수치에 도달한 시점부터 모델 학습 시작
             if len(agent.memory) >= agent.train_start:
@@ -261,15 +298,12 @@ def move():
                 # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
                 if global_step % agent.update_target_rate == 0:
                     agent.update_target_model()
-            print(done, '1111')
+
             if done:
-                history = np.stack((next_state, next_state,
-                                    next_state, next_state), axis=2)
-                history = np.reshape([history], (1, (1, state_size), 4))
+                history = np.float32([next_state, next_state, next_state, next_state])
             else:
                 history = next_history
 
-            print(done, '2222')
             if done:
                 # 각 에피소드 당 학습 정보를 기록
                 if global_step > agent.train_start:
@@ -297,62 +331,6 @@ def move():
         reset_game()
 
 
-rsize = 2
-csize = 2
-
-maze = []
-mazeMap = []
-
-
-def make_maze():
-    global maze, mazeMap
-    global rsize, csize
-
-    maze = [[Room(r, c) for c in range(csize)] for r in range(rsize)]
-    mazeMap = [[1 for c in range(csize * 2 + 1)] for r in range(rsize * 2 + 1)]
-    print(np.shape(maze))
-    print(np.shape(mazeMap))
-
-    make(None, maze[0][0], maze, rsize, csize)
-
-    while True:
-        r = random.randint(1, rsize * 2)
-        if mazeMap[r][-2] == 1:
-            continue
-        mazeMap[r][-1] = 2
-        break
-
-
-def reset_game():
-    global tk, canvas
-    global posX, posY
-    global maze, mazeMap
-
-    tk.destroy()
-
-    posX = 1
-    posY = 0
-
-    maze = []
-    maze = []
-
-    # make_maze()
-    generate()
-
-
-make_maze()
-
-key = 0
-posX = 1
-posY = 0
-
-tk = ''
-canvas = ''
-
-action_size = 4
-state_size = 2
-
-
 def generate():
     global mazeMap
     global rsize, csize
@@ -368,7 +346,17 @@ def generate():
             if mazeMap[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1', width='5')
             elif mazeMap[i][j] == 2:
-                canvas.create_oval(j * 50 + 5, i * 50 + 5, j * 50 + 50 - 5, i * 50 + 50 - 5, fill='#C3B0EA', outline='#242C2E', width='5')
+                # canvas.create_oval(j * 50 + 5, i * 50 + 5, j * 50 + 50 - 5, i * 50 + 50 - 5, fill='#C3B0EA', outline='#242C2E', width='5')
+                img = tkinter.PhotoImage(file='ball.png').subsample(25)
+                img.zoom(50, 50)
+
+                # canvas.create_image(j * 50 + 5, i * 50 + 5, image=img, tag='ball')
+                # canvas.coords('player', j * 50 + 5, i * 50 + 5)
+
+                label = tkinter.Label(image=img, borderwidth=0)
+                label.image = img
+                label.place(x=j*50+10, y=i*50+10)
+                label.configure()
 
     img = tkinter.PhotoImage(file='player.png').subsample(5)
     img.zoom(50, 50)
@@ -382,4 +370,23 @@ def generate():
     tk.mainloop()
 
 
+rsize = 2
+csize = 2
+
+maze = []
+mazeMap = []
+
+key = 0
+posX = 1
+posY = 0
+
+tk = ''
+canvas = ''
+
+action_size = 4
+state_size = 2
+
+done = False
+
+make_maze()
 generate()
