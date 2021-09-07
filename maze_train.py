@@ -115,14 +115,14 @@ class DQNAgent:
         # DQN 하이퍼파라미터
         self.discount_factor = 0.99
         self.learning_rate = 1e-4
-        self.epsilon = 1.
+        self.epsilon = 0.02
         self.epsilon_start, self.epsilon_end = 1.0, 0.02
         self.exploration_steps = 1000000.
         self.epsilon_decay_step = self.epsilon_start - self.epsilon_end
         self.epsilon_decay_step /= self.exploration_steps
         self.batch_size = 32
-        self.train_start = 50000
-        self.update_target_rate = 10000
+        self.train_start = 100
+        self.update_target_rate = 5
 
         # 리플레이 메모리, 최대 크기 100,000
         self.memory = deque(maxlen=100000)
@@ -152,7 +152,7 @@ class DQNAgent:
             return random.randint(0, self.action_size-1)
         else:
             q_value = self.model.call(history)
-            return np.argmax(q_value[0])
+            return np.argmax(q_value)
 
     # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장
     def append_sample(self, history, action, reward, next_history, done):
@@ -176,11 +176,11 @@ class DQNAgent:
         # 메모리에서 배치 크기만큼 무작위로 샘플 추출
         batch = random.sample(self.memory, self.batch_size)
 
-        history = np.array([sample[0] for sample in batch],
+        history = np.array([sample[0][0] for sample in batch],
                            dtype=np.float32)
         actions = np.array([sample[1] for sample in batch])
         rewards = np.array([sample[2] for sample in batch])
-        next_history = np.array([sample[3] for sample in batch],
+        next_history = np.array([sample[3][0] for sample in batch],
                                 dtype=np.float32)
         dones = np.array([sample[4] for sample in batch])
 
@@ -212,6 +212,11 @@ class DQNAgent:
         self.optimizer.apply_gradients(zip(grads, model_params))
 
 
+def nothing(gs, s):
+    gs -= 1
+    s -= 1
+
+
 def move():
     agent = DQNAgent(action_size=4)
 
@@ -223,6 +228,8 @@ def move():
     global_step = 0
     score_avg = 0
     score_max = 0
+
+    move_delay = 0.02
 
     # 불필요한 행동을 없애주기 위한 딕셔너리 선언
     action_dict = {0: 1, 1: 2, 2: 3, 3: 3}
@@ -246,31 +253,55 @@ def move():
 
             # 바로 전 history를 입력으로 받아 행동을 선택
             # 0: 위, 1: 아래, 2: 오른쪽, 3: 왼쪽
-            action = agent.get_action([history[0]])
+            action = agent.get_action(history)
 
             if action == 0:
                 if posY - 1 >= 0:
                     if mazeMap[posY - 1][posX] != 1:
                         posY -= 1
+                    else:
+                        nothing(global_step, step)
+                        continue
+                else:
+                    nothing(global_step, step)
+                    continue
             if action == 1:
                 if posY + 1 < rsize*2+1:
                     if mazeMap[posY + 1][posX] != 1:
                         posY += 1
+                    else:
+                        nothing(global_step, step)
+                        continue
+                else:
+                    nothing(global_step, step)
+                    continue
             if action == 2:
                 if posX + 1 < csize*2+1:
                     if mazeMap[posY][posX + 1] != 1:
                         posX += 1
+                    else:
+                        nothing(global_step, step)
+                        continue
+                else:
+                    nothing(global_step, step)
+                    continue
             if action == 3:
                 if posX - 1 > 0:
                     if mazeMap[posY][posX - 1] != 1:
                         posX -= 1
+                    else:
+                        nothing(global_step, step)
+                        continue
+                else:
+                    nothing(global_step, step)
+                    continue
 
             canvas.coords('player', posX * 50 + 25, posY * 50 + 25)
             canvas.pack()
 
             tk.update()
 
-            time.sleep(0.05)
+            time.sleep(move_delay)
 
             # print(posY, posX)
             # print(mazeMap[posY][posX])
@@ -285,7 +316,8 @@ def move():
 
             next_history = np.float32([next_state, history[0], history[1], history[2]])
 
-            agent.avg_q_max += np.amax(agent.model.call(np.float32([history[0]])))
+            # 가장 큰 Q값 가산
+            agent.avg_q_max += np.amax(agent.model.call(np.float32(history)))
 
             score += reward
             reward = np.clip(reward, -1., 1.)
@@ -313,9 +345,9 @@ def move():
                 score_max = score if score > score_max else score_max
 
                 log = "episode: {:5d} | ".format(e)
-                log += "score: {:4.1f} | ".format(score)
-                log += "score max : {:4.1f} | ".format(score_max)
-                log += "score avg: {:4.1f} | ".format(score_avg)
+                # log += "score: {:4.1f} | ".format(score)
+                # log += "score max : {:4.1f} | ".format(score_max)
+                # log += "score avg: {:4.1f} | ".format(score_avg)
                 log += "memory length: {:5d} | ".format(len(agent.memory))
                 log += "epsilon: {:.3f} | ".format(agent.epsilon)
                 log += "q avg : {:3.2f} | ".format(agent.avg_q_max / float(step))
@@ -325,7 +357,7 @@ def move():
                 agent.avg_q_max, agent.avg_loss = 0, 0
 
         # 1000 에피소드마다 모델 저장
-        if e % 1000 == 0:
+        if e % 100 == 0:
             agent.model.save_weights("./save_model/model", save_format="tf")
 
         reset_game()
