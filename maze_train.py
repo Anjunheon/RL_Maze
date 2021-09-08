@@ -7,7 +7,8 @@ import tensorflow as tf
 from collections import deque
 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.initializers import RandomUniform
 
 
 class Room:
@@ -50,13 +51,13 @@ def make(prev, room, _maze, _rsize, _csize):
 
 
 def make_maze():
-    global maze, mazeMap
+    global maze, mazeMap, visit
     global rsize, csize
+    global destY, destX
 
     maze = [[Room(r, c) for c in range(csize)] for r in range(rsize)]
     mazeMap = [[1 for c in range(csize * 2 + 1)] for r in range(rsize * 2 + 1)]
-    # print(np.shape(maze))
-    # print(np.shape(mazeMap))
+    visit = np.zeros(np.shape(mazeMap))
 
     make(None, maze[0][0], maze, rsize, csize)
 
@@ -65,13 +66,16 @@ def make_maze():
         if mazeMap[r][-2] == 1:
             continue
         mazeMap[r][-1] = 2
+        destY = r
+        destX = np.shape(mazeMap)[1]-1
+        print(destX, destY)
         break
 
 
 def reset_game():
     global tk, canvas
     global posX, posY
-    global maze, mazeMap
+    global maze, mazeMap, visit
     global done
 
     # tk.destroy()
@@ -81,6 +85,8 @@ def reset_game():
 
     maze = []
     # mazeMap = []
+    visit = np.zeros(np.shape(mazeMap))
+    visit[posY][posX] = 1
 
     done = False
 
@@ -93,13 +99,13 @@ def reset_game():
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
-        self.fc1 = Dense(128, activation='relu')
-        # self.fc2 = Dense(128, activation='relu')
-        self.fc_out = Dense(action_size)
+        self.fc1 = Dense(24, activation='relu')
+        self.fc2 = Dense(24, activation='relu')
+        self.fc_out = Dense(action_size, kernel_initializer=RandomUniform(-1e-3, 1e-3))
 
     def call(self, x):
         x = self.fc1(x)
-        # x = self.fc2(x)
+        x = self.fc2(x)
         q = self.fc_out(x)
         return q
 
@@ -115,17 +121,18 @@ class DQNAgent:
         # DQN 하이퍼파라미터
         self.discount_factor = 0.99
         self.learning_rate = 1e-4
-        self.epsilon = 0.02
+        self.epsilon = 1.
         self.epsilon_start, self.epsilon_end = 1.0, 0.02
         self.exploration_steps = 1000000.
-        self.epsilon_decay_step = self.epsilon_start - self.epsilon_end
-        self.epsilon_decay_step /= self.exploration_steps
-        self.batch_size = 32
-        self.train_start = 100
-        self.update_target_rate = 5
+        # self.epsilon_decay_step = self.epsilon_start - self.epsilon_end
+        # self.epsilon_decay_step /= self.exploration_steps
+        self.epsilon_decay_step = 0.999
+        self.batch_size = 64
+        self.train_start = 10000
+        self.update_target_rate = 200
 
-        # 리플레이 메모리, 최대 크기 100,000
-        self.memory = deque(maxlen=100000)
+        # 리플레이 메모리, 최대 크기 2000
+        self.memory = deque(maxlen=20000)
         # 게임 시작 후 랜덤하게 움직이지 않는 것에 대한 옵션
         self.no_op_steps = 30
 
@@ -171,39 +178,43 @@ class DQNAgent:
     # 리플레이 메모리에서 무작위로 추출한 배치로 모델 학습
     def train_model(self):
         if self.epsilon > self.epsilon_end:
-            self.epsilon -= self.epsilon_decay_step
+            # self.epsilon -= self.epsilon_decay_step
+            self.epsilon *= self.epsilon_decay_step
 
         # 메모리에서 배치 크기만큼 무작위로 샘플 추출
         batch = random.sample(self.memory, self.batch_size)
 
-        history = np.array([sample[0][0] for sample in batch],
-                           dtype=np.float32)
+        # history = np.array([sample[0][0] for sample in batch],
+        #                    dtype=np.float32)
+        state = np.array([sample[0] for sample in batch],
+                             dtype=np.float32)
         actions = np.array([sample[1] for sample in batch])
         rewards = np.array([sample[2] for sample in batch])
         next_history = np.array([sample[3][0] for sample in batch],
                                 dtype=np.float32)
-        dones = np.array([sample[4] for sample in batch])
+        next_state = np.array([sample[3] for sample in batch],
+                                dtype=np.float32)
+        dones = np.array([[sample[4]] for sample in batch])
 
         # 학습 파라메터
         model_params = self.model.trainable_variables
         with tf.GradientTape() as tape:
             # 현재 상태에 대한 모델의 큐함수
-            predicts = self.model.call(history)
+            # predicts = self.model.call(history)
+            predicts = self.model.call(np.float32([state]))
             one_hot_action = tf.one_hot(actions, self.action_size)
-            predicts = tf.reduce_sum(one_hot_action * predicts, axis=1)
+            predicts = tf.reduce_sum(one_hot_action * predicts, axis=-1)
 
             # 다음 상태에 대한 타깃 모델의 큐함수
-            target_predicts = self.target_model.call(next_history)
+            # target_predicts = self.target_model.call(next_history)
+            target_predicts = self.target_model.call(np.float32([next_state]))
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
-            max_q = np.amax(target_predicts, axis=1)
-            targets = rewards + (1 - dones) * self.discount_factor * max_q
+            max_q = np.amax(target_predicts, axis=-1)
+            targets = rewards + np.transpose(1 - dones) * self.discount_factor * max_q[0]
 
-            # 후버로스 계산
-            error = tf.abs(targets - predicts)
-            quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
-            linear_part = error - quadratic_part
-            loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
+            # 1) 벨만 최적 방정식을 이용한 업데이트 타깃
+            loss = tf.reduce_mean(tf.square(targets[0] - predicts[0]))
 
             self.avg_loss += loss.numpy()
 
@@ -221,18 +232,16 @@ def move():
     agent = DQNAgent(action_size=4)
 
     global posX, posY
+    global destX, destY
     global tk, canvas
-    global mazeMap
+    global mazeMap, visit
     global done
 
     global_step = 0
     score_avg = 0
     score_max = 0
 
-    move_delay = 0.02
-
-    # 불필요한 행동을 없애주기 위한 딕셔너리 선언
-    action_dict = {0: 1, 1: 2, 2: 3, 3: 3}
+    move_delay = 0.01
 
     num_episode = 50000
     for e in range(0, num_episode):
@@ -244,8 +253,7 @@ def move():
         # generate()
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
-        state = [posX, posY]
-        history = np.float32([state, state, state, state])
+        state = np.float32([posX, posY])
 
         while not done:
             global_step += 1
@@ -253,7 +261,7 @@ def move():
 
             # 바로 전 history를 입력으로 받아 행동을 선택
             # 0: 위, 1: 아래, 2: 오른쪽, 3: 왼쪽
-            action = agent.get_action(history)
+            action = agent.get_action(np.float32([state]))
 
             if action == 0:
                 if posY - 1 >= 0:
@@ -303,26 +311,34 @@ def move():
 
             time.sleep(move_delay)
 
-            # print(posY, posX)
-            # print(mazeMap[posY][posX])
-
             if mazeMap[posY][posX] == 2:
-                # print('Goal!')
                 done = True
                 reward = 1
 
-            # 각 타임스텝마다 상태 전처리
-            next_state = [posY, posX]
+            # if visit[posY][posX] == 10:
+            #     reward = -0.5
+            #     done = True
 
-            next_history = np.float32([next_state, history[0], history[1], history[2]])
+            # if not done:
+            #     if visit[posY][posX] >= 1:
+            #         visit[posY][posX] += 1
+            #         reward += -0.0001
+            #     else:
+            #         visit[posY][posX] = 1
+            #         reward += 0.0001
+
+            reward += -(np.abs(destX-posX) + np.abs(destY-posY)) / 100000
+
+            # 각 타임스텝마다 상태 전처리
+            next_state = np.float32([posY, posX])
 
             # 가장 큰 Q값 가산
-            agent.avg_q_max += np.amax(agent.model.call(np.float32(history)))
+            agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
 
             score += reward
             reward = np.clip(reward, -1., 1.)
             # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장 후 학습
-            agent.append_sample(history, action, reward, next_history, done)
+            agent.append_sample(state, action, reward, next_state, done)
 
             # 리플레이 메모리 크기가 정해놓은 수치에 도달한 시점부터 모델 학습 시작
             if len(agent.memory) >= agent.train_start:
@@ -332,11 +348,9 @@ def move():
                     agent.update_target_model()
 
             if done:
-                history = np.float32([next_state, next_state, next_state, next_state])
-            else:
-                history = next_history
+                # 각 에피소드마다 타깃 모델을 모델의 가중치로 업데이트
+                # agent.update_target_model()
 
-            if done:
                 # 각 에피소드 당 학습 정보를 기록
                 if global_step > agent.train_start:
                     agent.draw_tensorboard(score, step, e)
@@ -347,7 +361,7 @@ def move():
                 log = "episode: {:5d} | ".format(e)
                 # log += "score: {:4.1f} | ".format(score)
                 # log += "score max : {:4.1f} | ".format(score_max)
-                # log += "score avg: {:4.1f} | ".format(score_avg)
+                log += "score avg: {:4.1f} | ".format(score_avg)
                 log += "memory length: {:5d} | ".format(len(agent.memory))
                 log += "epsilon: {:.3f} | ".format(agent.epsilon)
                 log += "q avg : {:3.2f} | ".format(agent.avg_q_max / float(step))
@@ -364,7 +378,7 @@ def move():
 
 
 def generate():
-    global mazeMap
+    global mazeMap, visit
     global rsize, csize
     global tk, canvas
     global posX, posY
@@ -378,17 +392,15 @@ def generate():
             if mazeMap[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1', width='5')
             elif mazeMap[i][j] == 2:
-                # canvas.create_oval(j * 50 + 5, i * 50 + 5, j * 50 + 50 - 5, i * 50 + 50 - 5, fill='#C3B0EA', outline='#242C2E', width='5')
                 img = tkinter.PhotoImage(file='ball.png').subsample(25)
                 img.zoom(50, 50)
-
-                # canvas.create_image(j * 50 + 5, i * 50 + 5, image=img, tag='ball')
-                # canvas.coords('player', j * 50 + 5, i * 50 + 5)
 
                 label = tkinter.Label(image=img, borderwidth=0)
                 label.image = img
                 label.place(x=j*50+10, y=i*50+10)
                 label.configure()
+
+    visit[posY][posX] = 1
 
     img = tkinter.PhotoImage(file='player.png').subsample(6)
     img.zoom(50, 50)
@@ -402,15 +414,19 @@ def generate():
     tk.mainloop()
 
 
-rsize = 2
-csize = 2
+rsize = 5
+csize = 5
 
 maze = []
 mazeMap = []
+visit = []
 
 key = 0
 posX = 1
 posY = 0
+
+destX = 0
+destY = 0
 
 tk = ''
 canvas = ''
