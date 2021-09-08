@@ -312,7 +312,6 @@ def move():
             tk.update()
 
             # time.sleep(move_delay)
-            time.sleep(1)
 
             if mazeMap[posY][posX] == 2:
                 done = True
@@ -429,8 +428,8 @@ def generate():
     tk.mainloop()
 
 
-rsize = 3
-csize = 3
+rsize = 7
+csize = 15
 
 maze = []
 mazeMap = []
