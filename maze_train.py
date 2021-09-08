@@ -127,9 +127,9 @@ class DQNAgent:
         # self.epsilon_decay_step = self.epsilon_start - self.epsilon_end
         # self.epsilon_decay_step /= self.exploration_steps
         self.epsilon_decay_step = 0.999
-        self.batch_size = 64
-        self.train_start = 10000
-        self.update_target_rate = 200
+        self.batch_size = 32
+        self.train_start = 1000
+        self.update_target_rate = 20
 
         # 리플레이 메모리, 최대 크기 2000
         self.memory = deque(maxlen=20000)
@@ -200,13 +200,11 @@ class DQNAgent:
         model_params = self.model.trainable_variables
         with tf.GradientTape() as tape:
             # 현재 상태에 대한 모델의 큐함수
-            # predicts = self.model.call(history)
             predicts = self.model.call(np.float32([state]))
             one_hot_action = tf.one_hot(actions, self.action_size)
             predicts = tf.reduce_sum(one_hot_action * predicts, axis=-1)
 
             # 다음 상태에 대한 타깃 모델의 큐함수
-            # target_predicts = self.target_model.call(next_history)
             target_predicts = self.target_model.call(np.float32([next_state]))
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
@@ -309,7 +307,7 @@ def move():
 
             tk.update()
 
-            time.sleep(move_delay)
+            # time.sleep(move_delay)
 
             if mazeMap[posY][posX] == 2:
                 done = True
@@ -327,7 +325,7 @@ def move():
             #         visit[posY][posX] = 1
             #         reward += 0.0001
 
-            reward += -(np.abs(destX-posX) + np.abs(destY-posY)) / 100000
+            reward += -(np.abs(destX-posX) + np.abs(destY-posY)) / 1000
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32([posY, posX])
@@ -359,6 +357,8 @@ def move():
                 score_max = score if score > score_max else score_max
 
                 log = "episode: {:5d} | ".format(e)
+                log += "step: {:5d} | ".format(step)
+                log += "global step: {:5d} | ".format(global_step)
                 # log += "score: {:4.1f} | ".format(score)
                 # log += "score max : {:4.1f} | ".format(score_max)
                 log += "score avg: {:4.1f} | ".format(score_avg)
@@ -370,7 +370,7 @@ def move():
 
                 agent.avg_q_max, agent.avg_loss = 0, 0
 
-        # 1000 에피소드마다 모델 저장
+        # 100 에피소드마다 모델 저장
         if e % 100 == 0:
             agent.model.save_weights("./save_model/model", save_format="tf")
 
@@ -414,8 +414,8 @@ def generate():
     tk.mainloop()
 
 
-rsize = 5
-csize = 5
+rsize = 2
+csize = 2
 
 maze = []
 mazeMap = []
