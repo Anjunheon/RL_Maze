@@ -11,6 +11,9 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.initializers import RandomUniform
 
 
+PLAY_MODE = 0
+
+
 class Room:
     def __init__(self, r, c):
         self.r, self.c = r, c
@@ -111,7 +114,7 @@ class DQN(tf.keras.Model):
 
 
 class DQNAgent:
-    def __init__(self, action_size=4, state_size=2):
+    def __init__(self, action_size=4, state_size=(1, 3*2+1, 3*2+1, 1)):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -128,7 +131,7 @@ class DQNAgent:
         # self.epsilon_decay_step /= self.exploration_steps
         self.epsilon_decay_step = 0.999
         self.batch_size = 32
-        self.train_start = 1000000
+        self.train_start = 10
         self.update_target_rate = 200
 
         # 리플레이 메모리, 최대 크기 2000
@@ -186,7 +189,7 @@ class DQNAgent:
 
         # history = np.array([sample[0][0] for sample in batch],
         #                    dtype=np.float32)
-        state = np.array([sample[0] for sample in batch],
+        state = np.array([sample[0][0] for sample in batch],
                              dtype=np.float32)
         actions = np.array([sample[1] for sample in batch])
         rewards = np.array([sample[2] for sample in batch])
@@ -227,9 +230,10 @@ def nothing(gs, s):
 
 
 def move():
-    time.sleep(10)
+    # time.sleep(10)
     agent = DQNAgent(action_size=4)
 
+    global rsize, csize
     global posX, posY
     global destX, destY
     global tk, canvas
@@ -240,7 +244,7 @@ def move():
     score_avg = 0
     score_max = 0
 
-    move_delay = 0.01
+    move_delay = 0.00
 
     num_episode = 50000
     for e in range(0, num_episode):
@@ -255,7 +259,8 @@ def move():
         s1, s2, s3, s4 = 1, 0, 1, 1
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
-        state = np.float32([posX, posY, s1, s2, s3, s4])
+        state = mazeMap
+        print(np.shape(state))
 
         while not done:
             global_step += 1
@@ -311,25 +316,14 @@ def move():
 
             tk.update()
 
-            # time.sleep(move_delay)
+            time.sleep(move_delay)
 
             if mazeMap[posY][posX] == 2:
                 done = True
                 reward = 1
 
-            # if visit[posY][posX] == 10:
-            #     reward = -0.5
-            #     done = True
-
-            # if not done:
-            #     if visit[posY][posX] >= 1:
-            #         visit[posY][posX] += 1
-            #         reward += -0.0001
-            #     else:
-            #         visit[posY][posX] = 1
-            #         reward += 0.0001
-
-            reward += -(np.abs(destX-posX) + np.abs(destY-posY)) / 1000
+            # 중간 보상 : 맨해튼 거리 역수
+            reward += -1 / (np.abs(destX-posX) + np.abs(destY-posY))
 
             if posX == 1 and posY == 0:
                 s1, s2, s3, s4 = 1, 0, 1, 1
@@ -342,7 +336,8 @@ def move():
                 s4 = mazeMap[posX+1][posY]
 
             # 각 타임스텝마다 상태 전처리
-            next_state = np.float32([posY, posX, s1, s2, s3, s4])
+            next_state = np.float32(mazeMap)
+            next_state = np.reshape([next_state], (1, rsize*2+1, csize*2+1, 1))
 
             # 가장 큰 Q값 가산
             agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
@@ -428,8 +423,8 @@ def generate():
     tk.mainloop()
 
 
-rsize = 7
-csize = 15
+rsize = 3
+csize = 3
 
 maze = []
 mazeMap = []
@@ -437,7 +432,7 @@ visit = []
 
 key = 0
 posX = 1
-posY = 1
+posY = 0
 
 destX = 0
 destY = 0
@@ -446,7 +441,7 @@ tk = ''
 canvas = ''
 
 action_size = 4
-state_size = 2
+state_size = (1, rsize*2+1, csize*2+1, 1)
 
 done = False
 
