@@ -6,10 +6,13 @@ import time
 import tensorflow as tf
 from collections import deque
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D
 from tensorflow.keras.initializers import RandomUniform
 
+import pprint
 
 PLAY_MODE = 0
 
@@ -71,7 +74,7 @@ def make_maze():
         mazeMap[r][-1] = 2
         destY = r
         destX = np.shape(mazeMap)[1]-1
-        print(destX, destY)
+        # print(destX, destY)
         break
 
 
@@ -102,19 +105,24 @@ def reset_game():
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
-        self.fc1 = Dense(32, activation='relu')
-        self.fc2 = Dense(32, activation='relu')
-        self.fc_out = Dense(action_size, kernel_initializer=RandomUniform(-1e-3, 1e-3))
+        self.conv1 = Conv2D(16, (4, 4), strides=(2, 2), activation='relu',
+                            input_shape=state_size)
+        self.conv2 = Conv2D(32, (2, 2), strides=(1, 1), activation='relu')
+        self.flatten = Flatten()
+        self.fc = Dense(128, activation='relu')
+        self.fc_out = Dense(action_size)
 
     def call(self, x):
-        x = self.fc1(x)
-        x = self.fc2(x)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.flatten(x)
+        x = self.fc(x)
         q = self.fc_out(x)
         return q
 
 
 class DQNAgent:
-    def __init__(self, action_size=4, state_size=(1, 3*2+1, 3*2+1, 1)):
+    def __init__(self, action_size=4, state_size=(3*2+1, 3*2+1, 1)):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -131,8 +139,8 @@ class DQNAgent:
         # self.epsilon_decay_step /= self.exploration_steps
         self.epsilon_decay_step = 0.999
         self.batch_size = 32
-        self.train_start = 10
-        self.update_target_rate = 200
+        self.train_start = 5000
+        self.update_target_rate = 30
 
         # 리플레이 메모리, 최대 크기 2000
         self.memory = deque(maxlen=20000)
@@ -199,16 +207,16 @@ class DQNAgent:
                                 dtype=np.float32)
         dones = np.array([[sample[4]] for sample in batch])
 
-        # 학습 파라메터
+        # 학습 파라미터
         model_params = self.model.trainable_variables
         with tf.GradientTape() as tape:
             # 현재 상태에 대한 모델의 큐함수
-            predicts = self.model.call(np.float32([state]))
+            predicts = self.model.call(np.float32(state))
             one_hot_action = tf.one_hot(actions, self.action_size)
-            predicts = tf.reduce_sum(one_hot_action * predicts, axis=-1)
+            predicts = tf.reduce_sum(one_hot_action * predicts, axis=1)
 
             # 다음 상태에 대한 타깃 모델의 큐함수
-            target_predicts = self.target_model.call(np.float32([next_state]))
+            target_predicts = self.target_model.call(np.float32(next_state))
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
             max_q = np.amax(target_predicts, axis=-1)
@@ -233,6 +241,12 @@ def move():
     # time.sleep(10)
     agent = DQNAgent(action_size=4)
 
+    agent.model.build(input_shape=(1, 3*2+1, 3*2+1, 1))
+    agent.target_model.build(input_shape=(1, 3*2+1, 3*2+1, 1))
+
+    agent.model.summary()
+    agent.target_model.summary()
+
     global rsize, csize
     global posX, posY
     global destX, destY
@@ -243,6 +257,9 @@ def move():
     global_step = 0
     score_avg = 0
     score_max = 0
+
+    degree = 0
+    rotate = {0: 0, 1: 90, 2: 180, 3: 270}
 
     move_delay = 0.00
 
@@ -259,81 +276,73 @@ def move():
         s1, s2, s3, s4 = 1, 0, 1, 1
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
-        state = mazeMap
-        print(np.shape(state))
+        state = np.float32(mazeMap)
+        state = np.reshape([state], (1, rsize*2+1, csize*2+1, 1))
 
         while not done:
+            # time.sleep(0.5)
             global_step += 1
             step += 1
 
             # 바로 전 history를 입력으로 받아 행동을 선택
             # 0: 위, 1: 아래, 2: 오른쪽, 3: 왼쪽
-            action = agent.get_action(np.float32([state]))
+            action = agent.get_action(np.float32(state))
 
-            if action == 0:
-                if posY - 1 >= 0:
-                    if mazeMap[posY - 1][posX] != 1:
-                        posY -= 1
-                    else:
-                        nothing(global_step, step)
-                        continue
-                else:
-                    nothing(global_step, step)
-                    continue
-            if action == 1:
-                if posY + 1 < rsize*2+1:
-                    if mazeMap[posY + 1][posX] != 1:
+            degree += rotate[action]
+            degree %= 360
+
+            if degree == 0:
+                if posY+1 < rsize*2+1:
+                    if mazeMap[posY+1][posX] != 1:
                         posY += 1
                     else:
                         nothing(global_step, step)
                         continue
-                else:
-                    nothing(global_step, step)
-                    continue
-            if action == 2:
-                if posX + 1 < csize*2+1:
-                    if mazeMap[posY][posX + 1] != 1:
+            elif degree == 90:
+                if posX+1 < csize*2+1:
+                    if mazeMap[posY][posX+1] != 1:
                         posX += 1
                     else:
                         nothing(global_step, step)
                         continue
-                else:
-                    nothing(global_step, step)
-                    continue
-            if action == 3:
-                if posX - 1 > 0:
-                    if mazeMap[posY][posX - 1] != 1:
+            elif degree == 180:
+                if posY-1 >= 0:
+                    if mazeMap[posY-1][posX] != 1:
+                        posY -= 1
+                    else:
+                        nothing(global_step, step)
+                        continue
+            elif degree == 270:
+                if posX-1 >= 0:
+                    if mazeMap[posY][posX-1] != 1:
                         posX -= 1
                     else:
                         nothing(global_step, step)
                         continue
-                else:
-                    nothing(global_step, step)
-                    continue
 
             canvas.coords('player', posX * 50 + 25, posY * 50 + 25)
             canvas.pack()
 
             tk.update()
 
-            time.sleep(move_delay)
-
             if mazeMap[posY][posX] == 2:
                 done = True
                 reward = 1
 
             # 중간 보상 : 맨해튼 거리 역수
-            reward += -1 / (np.abs(destX-posX) + np.abs(destY-posY))
+            if not done:
+                reward += -1 / (np.abs(destX-posX) + np.abs(destY-posY))
 
-            if posX == 1 and posY == 0:
-                s1, s2, s3, s4 = 1, 0, 1, 1
-            elif done:
-                s1, s2, s3, s4 = 1, 1, 0, 1
-            else:
-                s1 = mazeMap[posX][posY-1]
-                s2 = mazeMap[posX][posY+1]
-                s3 = mazeMap[posX-1][posY]
-                s4 = mazeMap[posX+1][posY]
+            # 캐릭터 상, 하, 좌, 우 블럭 정보
+            # if posX == 1 and posY == 0:
+            #     s1, s2, s3, s4 = 1, 0, 1, 1
+            # elif done:
+            #     s1, s2, s3, s4 = 1, 1, 0, 1
+            # else:
+            #     s1 = mazeMap[posX][posY-1]
+            #     s2 = mazeMap[posX][posY+1]
+            #     s3 = mazeMap[posX-1][posY]
+            #     s4 = mazeMap[posX+1][posY]
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32(mazeMap)
@@ -383,6 +392,7 @@ def move():
         if e % 100 == 0:
             agent.model.save_weights("./save_model/model", save_format="tf")
 
+        degree = 0
         reset_game()
 
 
@@ -440,8 +450,8 @@ destY = 0
 tk = ''
 canvas = ''
 
-action_size = 4
-state_size = (1, rsize*2+1, csize*2+1, 1)
+# action_size = 4
+# state_size = (1, rsize*2+1, csize*2+1, 1)
 
 done = False
 
