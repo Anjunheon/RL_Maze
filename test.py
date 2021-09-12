@@ -17,6 +17,7 @@ import pprint
 PLAY_MODE = 0
 
 
+# 0: 길, 1: 벽, 2: 도착지, 3: 플레이어(?)
 class Room:
     def __init__(self, r, c):
         self.r, self.c = r, c
@@ -85,6 +86,7 @@ def reset_game():
     global done
 
     # tk.destroy()
+    # mazeMap[posY][posX] = 0
 
     posX = 1
     posY = 0
@@ -93,6 +95,7 @@ def reset_game():
     # mazeMap = []
     visit = np.zeros(np.shape(mazeMap))
     visit[posY][posX] = 1
+    mazeMap[posY][posX] = 3
 
     done = False
 
@@ -184,7 +187,7 @@ class DQNAgent:
         self.epsilon_decay_step = 0.999
         self.batch_size = 32
         self.train_start = 10000
-        self.update_target_rate = 30
+        self.update_target_rate = 100
 
         # 리플레이 메모리, 최대 크기 2000
         self.memory = deque(maxlen=200000)
@@ -290,7 +293,6 @@ def move():
     global mazeMap, visit
     global done
 
-    # time.sleep(0.05)
     agent = DQNAgent(action_size=4, state_size=(1, rsize*2+1, csize*2+1, 1))
 
     agent.model.build(input_shape=(1, rsize*2+1, csize*2+1, 1))
@@ -337,61 +339,62 @@ def move():
             degree += rotate[action]
             degree %= 360
 
+            mazeMap[posY][posX] = 0
+
             if degree == 0:
                 if posY+1 < rsize*2+1:
                     if mazeMap[posY+1][posX] != 1:
                         posY += 1
                     else:
-                        nothing(global_step, step)
+                        global_step -= 1
+                        step -= 1
                         continue
             elif degree == 90:
                 if posX+1 < csize*2+1:
                     if mazeMap[posY][posX+1] != 1:
                         posX += 1
                     else:
-                        nothing(global_step, step)
+                        global_step -= 1
+                        step -= 1
                         continue
             elif degree == 180:
                 if posY-1 >= 0:
                     if mazeMap[posY-1][posX] != 1:
                         posY -= 1
                     else:
-                        nothing(global_step, step)
+                        global_step -= 1
+                        step -= 1
                         continue
             elif degree == 270:
                 if posX-1 >= 0:
                     if mazeMap[posY][posX-1] != 1:
                         posX -= 1
                     else:
-                        nothing(global_step, step)
+                        global_step -= 1
+                        step -= 1
                         continue
 
-            # 회전된 미로 그래픽 출력
-            rotate_maze(degree)
+            if mazeMap[posY][posX] != 2:
+                mazeMap[posY][posX] = 3
 
-            # canvas.coords('player', posX * 50 + 25, posY * 50 + 25)
+            # 회전된 미로 그래픽 출력
+            # rotate_maze(degree)
+
+            canvas.coords('player', posX * 50 + 25, posY * 50 + 25)
             canvas.pack()
 
             tk.update()
 
             if mazeMap[posY][posX] == 2:
                 done = True
-                reward = 1
+                reward = 0.5
 
             # 중간 보상 : 맨해튼 거리 역수
-            # if not done:
-            #     reward += -1 / (np.abs(destX-posX) + np.abs(destY-posY))
-
-            # 캐릭터 상, 하, 좌, 우 블럭 정보
-            # if posX == 1 and posY == 0:
-            #     s1, s2, s3, s4 = 1, 0, 1, 1
-            # elif done:
-            #     s1, s2, s3, s4 = 1, 1, 0, 1
-            # else:
-            #     s1 = mazeMap[posX][posY-1]
-            #     s2 = mazeMap[posX][posY+1]
-            #     s3 = mazeMap[posX-1][posY]
-            #     s4 = mazeMap[posX+1][posY]
+            if not done:
+                # reward = -1 / ((np.abs(destX-posX) + np.abs(destY-posY) + 0.001))
+                reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 8, 2) + 0.5
+                # reward += -round(1 / 900, 3)
+                print(reward)
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32(mazeMap)
@@ -445,11 +448,63 @@ def move():
         reset_game()
 
 
+def rotate_test():
+    global tk, canvas
+    global mazeMap
+    global posX, posY
+    global player, ball
+
+    p_maze = np.array(list(map(list, zip(*mazeMap[::-1]))))
+
+    pprint.pprint(mazeMap)
+    pprint.pprint(p_maze)
+
+    canvas.delete('all')
+
+    # canvas = tkinter.Canvas(width=(csize * 2 + 1) * 50, height=(rsize * 2 + 1) * 50, bg='#242C2E')
+
+    for i, r in enumerate(p_maze):
+        for j, c in enumerate(r):
+            canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#242C2E', outline='#242C2E',
+                                    width='5')
+
+    for i, r in enumerate(p_maze):
+        for j, c in enumerate(r):
+            if p_maze[i][j] == 1:
+                canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1', width='5')
+            elif p_maze[i][j] == 2:
+                ball.destroy()
+
+                img = tkinter.PhotoImage(file='ball.png').subsample(25)
+                img.zoom(50, 50)
+
+                ball = tkinter.Label(image=img, borderwidth=0)
+                ball.image = img
+                ball.place(x=j*50+10, y=i*50+10)
+                ball.configure()
+
+    # 플레이어 y 좌표
+    posY = np.where(p_maze == 3)[0][0]
+    # 플레이어 x 좌표
+    posX = np.where(p_maze == 3)[1][0]
+
+    img = tkinter.PhotoImage(file='player.png').subsample(6)
+    img.zoom(50, 50)
+
+    canvas.create_image(posX * 50 + 25, posY * 50 + 25, image=img, tag='player')
+    canvas.update()
+
+    tk.update()
+
+    time.sleep(5)
+
+
 def generate():
     global mazeMap, visit
     global rsize, csize
     global tk, canvas
     global posX, posY
+    global player, ball
 
     tk = tkinter.Tk()
     tk.title('Maze Map')
@@ -463,26 +518,27 @@ def generate():
                 img = tkinter.PhotoImage(file='ball.png').subsample(25)
                 img.zoom(50, 50)
 
-                label = tkinter.Label(image=img, borderwidth=0)
-                label.image = img
-                label.place(x=j*50+10, y=i*50+10)
-                label.configure()
+                ball = tkinter.Label(image=img, borderwidth=0)
+                ball.image = img
+                ball.place(x=j*50+10, y=i*50+10)
+                ball.configure()
 
     visit[posY][posX] = 1
+    mazeMap[posY][posX] = 3
 
     img = tkinter.PhotoImage(file='player.png').subsample(6)
     img.zoom(50, 50)
 
-    canvas.create_image(posX * 50 + 25, posY * 50 + 25, image=img, tag='player')
+    player = canvas.create_image(posX * 50 + 25, posY * 50 + 25, image=img, tag='player')
     canvas.pack()
 
-    tk.after(1000, move)
+    tk.after(1000, rotate_test)
 
     tk.focus_force()
     tk.mainloop()
 
 
-rsize = 5
+rsize = 3
 csize = 3
 
 maze = []
@@ -498,6 +554,9 @@ destY = 0
 
 tk = ''
 canvas = ''
+
+player = ''
+ball = ''
 
 # action_size = 4
 # state_size = (1, rsize*2+1, csize*2+1, 1)
