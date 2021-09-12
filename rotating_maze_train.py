@@ -3,11 +3,11 @@ import numpy as np
 import tkinter
 import os
 import time
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import tensorflow as tf
 from collections import deque
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D
 from tensorflow.keras.initializers import RandomUniform
@@ -15,7 +15,7 @@ from tensorflow.keras.initializers import RandomUniform
 import pprint
 
 PLAY_MODE = 0
-ROTATION_MODE = False
+ROTATION_MODE = True
 ROTATE_DELAY = 0.0
 MOVE_DELAY = 0.0
 
@@ -147,13 +147,6 @@ def rotate_maze(degree):
             if p_maze[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1', width='5')
             elif p_maze[i][j] == 2:
-                ball.destroy()
-
-                img = tkinter.PhotoImage(file='ball.png').subsample(25)
-                img.zoom(50, 50)
-
-                ball = tkinter.Label(image=img, borderwidth=0)
-                ball.image = img
                 ball.place(x=j*50+10, y=i*50+10)
                 ball.configure()
 
@@ -162,13 +155,6 @@ def rotate_maze(degree):
     # 플레이어 x 좌표
     p_x = np.where(p_maze == 3)[1][0]
 
-    player.destroy()
-
-    img = tkinter.PhotoImage(file='player.png').subsample(6)
-    img.zoom(50, 50)
-
-    player = tkinter.Label(image=img, borderwidth=0)
-    player.image = img
     player.place(x=p_x * 50 + 5, y=p_y * 50 + 5)
     player.configure()
 
@@ -203,13 +189,6 @@ def move_player(degree):
     # 플레이어 x 좌표
     p_x = np.where(p_maze == 3)[1][0]
 
-    player.destroy()
-
-    img = tkinter.PhotoImage(file='player.png').subsample(6)
-    img.zoom(50, 50)
-
-    player = tkinter.Label(image=img, borderwidth=0)
-    player.image = img
     player.place(x=p_x * 50 + 5, y=p_y * 50 + 5)
     player.configure()
 
@@ -461,13 +440,6 @@ def move():
                 if ROTATION_MODE:
                     move_player(degree)
                 else:
-                    player.destroy()
-
-                    img = tkinter.PhotoImage(file='player.png').subsample(6)
-                    img.zoom(50, 50)
-
-                    player = tkinter.Label(image=img, borderwidth=0)
-                    player.image = img
                     player.place(x=posX * 50 + 5, y=posY * 50 + 5)
                     player.configure()
 
