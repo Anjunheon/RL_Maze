@@ -93,6 +93,8 @@ def reset_game():
     # make_maze()
     # generate()
 
+    rotate
+
     tk.update()
 
 
