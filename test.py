@@ -102,6 +102,50 @@ def reset_game():
     tk.update()
 
 
+def rotate_maze(degree):
+    global tk, canvas
+    global rsize, csize
+    global posX, posY
+    global maze, mazeMap, visit
+
+    p_maze = []
+
+    # 회전된 미로 그래픽 출력
+    if degree == 0:
+        p_maze = mazeMap
+        canvas = tkinter.Canvas(width=(csize * 2 + 1) * 50, height=(rsize * 2 + 1) * 50, bg='#242C2E')
+    elif degree == 90:
+        p_maze = np.array(map(list, zip(*mazeMap[::-1])))
+        canvas = tkinter.Canvas(width=(rsize * 2 + 1) * 50, height=(csize * 2 + 1) * 50, bg='#242C2E')
+    elif degree == 180:
+        p_maze = np.array(map(list, zip(*mazeMap[::-1])))
+        p_maze = np.array(map(list, zip(*p_maze[::-1])))
+        canvas = tkinter.Canvas(width=(csize * 2 + 1) * 50, height=(rsize * 2 + 1) * 50, bg='#242C2E')
+    elif degree == 270:
+        p_maze = np.array(map(list, zip(*mazeMap)))[::-1]
+        canvas = tkinter.Canvas(width=(rsize * 2 + 1) * 50, height=(csize * 2 + 1) * 50, bg='#242C2E')
+
+    img = tkinter.PhotoImage(file='player.png').subsample(6)
+    img.zoom(50, 50)
+
+    for i, r in enumerate(p_maze):
+        for j, c in enumerate(r):
+            if p_maze[i][j] == 1:
+                canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1', width='5')
+                canvas.create_image(posX * 50 + 25, posY * 50 + 25, image=img, tag='player')
+            elif p_maze[i][j] == 2:
+                img = tkinter.PhotoImage(file='ball.png').subsample(25)
+                img.zoom(50, 50)
+
+                label = tkinter.Label(image=img, borderwidth=0)
+                label.image = img
+                label.place(x=j*50+10, y=i*50+10)
+                label.configure()
+
+    canvas.pack()
+    tk.update()
+
+
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
@@ -109,7 +153,7 @@ class DQN(tf.keras.Model):
                             input_shape=state_size)
         self.conv2 = Conv2D(32, (2, 2), strides=(1, 1), activation='relu')
         self.flatten = Flatten()
-        self.fc = Dense(128, activation='relu')
+        self.fc = Dense(32, activation='relu')
         self.fc_out = Dense(action_size)
 
     def call(self, x):
@@ -122,7 +166,7 @@ class DQN(tf.keras.Model):
 
 
 class DQNAgent:
-    def __init__(self, action_size=4, state_size=(3*2+1, 3*2+1, 1)):
+    def __init__(self, action_size=4, state_size=(1, 2*2+1, 2*2+1, 1)):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -139,18 +183,19 @@ class DQNAgent:
         # self.epsilon_decay_step /= self.exploration_steps
         self.epsilon_decay_step = 0.999
         self.batch_size = 32
-        self.train_start = 5000
+        self.train_start = 10000
         self.update_target_rate = 30
 
         # 리플레이 메모리, 최대 크기 2000
-        self.memory = deque(maxlen=20000)
+        self.memory = deque(maxlen=200000)
         # 게임 시작 후 랜덤하게 움직이지 않는 것에 대한 옵션
-        self.no_op_steps = 30
+        self.no_op_steps = 50
 
         # 모델과 타깃 모델 생성
         self.model = DQN(action_size, state_size)
         self.target_model = DQN(action_size, state_size)
         self.optimizer = Adam(self.learning_rate, clipnorm=10.)
+
         # 타깃 모델 초기화
         self.update_target_model()
 
@@ -238,21 +283,21 @@ def nothing(gs, s):
 
 
 def move():
-    # time.sleep(10)
-    agent = DQNAgent(action_size=4)
-
-    agent.model.build(input_shape=(1, 3*2+1, 3*2+1, 1))
-    agent.target_model.build(input_shape=(1, 3*2+1, 3*2+1, 1))
-
-    agent.model.summary()
-    agent.target_model.summary()
-
     global rsize, csize
     global posX, posY
     global destX, destY
     global tk, canvas
     global mazeMap, visit
     global done
+
+    # time.sleep(0.05)
+    agent = DQNAgent(action_size=4, state_size=(1, rsize*2+1, csize*2+1, 1))
+
+    agent.model.build(input_shape=(1, rsize*2+1, csize*2+1, 1))
+    agent.target_model.build(input_shape=(1, rsize*2+1, csize*2+1, 1))
+
+    agent.model.summary()
+    agent.target_model.summary()
 
     global_step = 0
     score_avg = 0
@@ -271,6 +316,7 @@ def move():
         step, score = 0, 0
         # 미로 생성
         # generate()
+        p_maze = mazeMap
 
         # 에이전트 기준 상, 하, 좌, 우
         s1, s2, s3, s4 = 1, 0, 1, 1
@@ -280,7 +326,7 @@ def move():
         state = np.reshape([state], (1, rsize*2+1, csize*2+1, 1))
 
         while not done:
-            # time.sleep(0.5)
+            # time.sleep(0.001)
             global_step += 1
             step += 1
 
@@ -320,7 +366,10 @@ def move():
                         nothing(global_step, step)
                         continue
 
-            canvas.coords('player', posX * 50 + 25, posY * 50 + 25)
+            # 회전된 미로 그래픽 출력
+            rotate_maze(degree)
+
+            # canvas.coords('player', posX * 50 + 25, posY * 50 + 25)
             canvas.pack()
 
             tk.update()
@@ -330,8 +379,8 @@ def move():
                 reward = 1
 
             # 중간 보상 : 맨해튼 거리 역수
-            if not done:
-                reward += -1 / (np.abs(destX-posX) + np.abs(destY-posY))
+            # if not done:
+            #     reward += -1 / (np.abs(destX-posX) + np.abs(destY-posY))
 
             # 캐릭터 상, 하, 좌, 우 블럭 정보
             # if posX == 1 and posY == 0:
@@ -433,7 +482,7 @@ def generate():
     tk.mainloop()
 
 
-rsize = 3
+rsize = 5
 csize = 3
 
 maze = []
