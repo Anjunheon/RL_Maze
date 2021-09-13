@@ -15,9 +15,10 @@ from tensorflow.keras.initializers import RandomUniform
 import pprint
 
 PLAY_MODE = 0
-ROTATION_MODE = True
+ROTATION_MODE = False  # 미로 회전 그래픽 출력
 ROTATE_DELAY = 0.0
 MOVE_DELAY = 0.0
+USE_MAX_STEP = False
 
 
 # 0: 길, 1: 벽, 2: 도착지, 3: 플레이어(?)
@@ -90,7 +91,7 @@ def reset_maze():
     global p_x, p_y
     global player, ball
 
-    mazeMap[posY][posX] = 2
+    # mazeMap[posY][posX] = 2
 
     posX = 1
     posY = 0
@@ -201,11 +202,11 @@ def move_player(degree):
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
-        self.conv1 = Conv2D(16, (4, 4), strides=(2, 2), activation='relu',
+        self.conv1 = Conv2D(8, (4, 4), strides=(2, 2), activation='relu',
                             input_shape=state_size)
-        self.conv2 = Conv2D(32, (2, 2), strides=(1, 1), activation='relu')
+        self.conv2 = Conv2D(16, (2, 2), strides=(1, 1), activation='relu')
         self.flatten = Flatten()
-        self.fc = Dense(32, activation='relu')
+        self.fc = Dense(128, activation='relu')
         self.fc_out = Dense(action_size)
 
     def call(self, x):
@@ -230,16 +231,18 @@ class DQNAgent:
         self.learning_rate = 1e-4
         self.epsilon = 1.
         self.epsilon_start, self.epsilon_end = 1.0, 0.02
-        self.exploration_steps = 1000000.
+        # self.exploration_steps = 1000000.
         # self.epsilon_decay_step = self.epsilon_start - self.epsilon_end
         # self.epsilon_decay_step /= self.exploration_steps
         self.epsilon_decay_step = 0.999
+        self.max_step = 200
         self.batch_size = 32
         self.train_start = 10000
-        self.update_target_rate = 100
+        self.train_freq = 4
+        self.update_target_rate = 10
 
         # 리플레이 메모리, 최대 크기 2000
-        self.memory = deque(maxlen=200000)
+        self.memory = deque(maxlen=100000)
         # 게임 시작 후 랜덤하게 움직이지 않는 것에 대한 옵션
         self.no_op_steps = 50
 
@@ -310,17 +313,17 @@ class DQNAgent:
             # 현재 상태에 대한 모델의 큐함수
             predicts = self.model.call(np.float32(state))
             one_hot_action = tf.one_hot(actions, self.action_size)
-            predicts = tf.reduce_sum(one_hot_action * predicts, axis=1)
+            predicts = tf.reduce_sum(one_hot_action * predicts, axis=-1)
 
             # 다음 상태에 대한 타깃 모델의 큐함수
             target_predicts = self.target_model.call(np.float32(next_state))
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
             max_q = np.amax(target_predicts, axis=-1)
-            targets = rewards + np.transpose(1 - dones) * self.discount_factor * max_q[0]
+            targets = rewards + np.transpose(1 - dones) * self.discount_factor * max_q
 
             # 1) 벨만 최적 방정식을 이용한 업데이트 타깃
-            loss = tf.reduce_mean(tf.square(targets[0] - predicts[0]))
+            loss = tf.reduce_mean(tf.square(targets[0] - predicts))
 
             self.avg_loss += loss.numpy()
 
@@ -362,8 +365,6 @@ def move():
         done = False
 
         step, score = 0, 0
-        # 미로 생성
-        # generate()
 
         # 에이전트 기준 상, 하, 좌, 우
         s1, s2, s3, s4 = 1, 0, 1, 1
@@ -394,38 +395,19 @@ def move():
                 if posY+1 < rsize*2+1:
                     if mazeMap[posY+1][posX] != 1:
                         posY += 1
-                    else:
-                        global_step -= 1
-                        step -= 1
-                        mazeMap[posY][posX] = 3
-                        continue
             elif degree == 90:
                 if posX+1 < csize*2+1:
                     if mazeMap[posY][posX+1] != 1:
                         posX += 1
-                    else:
-                        global_step -= 1
-                        step -= 1
-                        mazeMap[posY][posX] = 3
-                        continue
             elif degree == 180:
                 if posY-1 >= 0:
                     if mazeMap[posY-1][posX] != 1:
                         posY -= 1
-                    else:
-                        global_step -= 1
-                        step -= 1
-                        mazeMap[posY][posX] = 3
-                        continue
             elif degree == 270:
                 if posX-1 >= 0:
                     if mazeMap[posY][posX-1] != 1:
                         posX -= 1
-                    else:
-                        global_step -= 1
-                        step -= 1
-                        mazeMap[posY][posX] = 3
-                        continue
+            # print(posY, posX)
 
             if mazeMap[posY][posX] == 2:
                 mazeMap[posY][posX] = 3
@@ -433,7 +415,7 @@ def move():
                 mazeMap[posY][posX] = 2
 
                 done = True
-                reward = 0.5
+                reward = 10
 
             if not done:
                 mazeMap[posY][posX] = 3
@@ -446,12 +428,20 @@ def move():
                     canvas.pack()
                     tk.update()
 
-            # 중간 보상 : 맨해튼 거리 역수
+            # 중간 보상 : 맨해튼 거리
             if not done:
-                # reward = -1 / ((np.abs(destX-posX) + np.abs(destY-posY) + 0.001))
-                reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 8, 2) + 0.5
-                # reward += -round(1 / 900, 3)
-                # print(reward)
+                if USE_MAX_STEP:
+                    if step == agent.max_step:
+                        reward = -1
+                        done = True
+                # else:
+                    # reward = -1 / 400 + ((np.abs(destX-posX) + np.abs(destY-posY))) / 10000
+                    # reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 10, 3)
+                    # reward = -1 / ((np.abs(destX-posX) + np.abs(destY-posY) + 0.001))
+                    # reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 8, 2) + 0.5
+                    # reward += -round(1 / 900, 3)
+                    # reward = -((np.abs(destX-posX) + np.abs(destY-posY))) / 10
+            # print(reward)
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32(mazeMap)
@@ -467,26 +457,27 @@ def move():
 
             # 리플레이 메모리 크기가 정해놓은 수치에 도달한 시점부터 모델 학습 시작
             if len(agent.memory) >= agent.train_start:
-                agent.train_model()
-                # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
-                if global_step % agent.update_target_rate == 0:
-                    agent.update_target_model()
+                if step % agent.train_freq == 0:
+                    agent.train_model()
+                    # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
+                    # if global_step % agent.update_target_rate == 0:
+                    #     agent.update_target_model()
 
             if done:
                 # 각 에피소드마다 타깃 모델을 모델의 가중치로 업데이트
-                # agent.update_target_model()
+                agent.update_target_model()
 
                 # 각 에피소드 당 학습 정보를 기록
                 if global_step > agent.train_start:
                     agent.draw_tensorboard(score, step, e)
 
-                score_avg = 0.9 * score_avg + 0.1 * score if score_avg != 0 else score
+                score_avg = score / float(step)
                 score_max = score if score > score_max else score_max
 
                 log = "episode: {:5d} | ".format(e)
                 log += "step: {:5d} | ".format(step)
                 log += "global step: {:5d} | ".format(global_step)
-                # log += "score: {:4.1f} | ".format(score)
+                log += "score: {:4.1f} | ".format(score)
                 # log += "score max : {:4.1f} | ".format(score_max)
                 log += "score avg: {:4.1f} | ".format(score_avg)
                 log += "memory length: {:5d} | ".format(len(agent.memory))
