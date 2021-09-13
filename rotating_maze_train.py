@@ -381,11 +381,13 @@ def move():
             # 바로 전 history를 입력으로 받아 행동을 선택
             # 0: 위, 1: 아래, 2: 오른쪽, 3: 왼쪽
             action = agent.get_action(np.float32(state))
+            
+            # 현재 각도 기준으로 회전
+            degree += rotate[action]
+            degree %= 360
 
-            # degree += rotate[action]
-            # degree %= 360
-
-            degree = rotate[action]
+            # 초기 미로 각도 기준 회전 각도 설정
+            # degree = rotate[action]
 
             # 회전된 미로 그래픽 출력
             if ROTATION_MODE:
