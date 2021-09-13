@@ -206,7 +206,7 @@ class DQN(tf.keras.Model):
                             input_shape=state_size)
         self.conv2 = Conv2D(16, (2, 2), strides=(1, 1), activation='relu')
         self.flatten = Flatten()
-        self.fc = Dense(128, activation='relu')
+        self.fc = Dense(64, activation='relu')
         self.fc_out = Dense(action_size)
 
     def call(self, x):
@@ -382,8 +382,10 @@ def move():
             # 0: 위, 1: 아래, 2: 오른쪽, 3: 왼쪽
             action = agent.get_action(np.float32(state))
 
-            degree += rotate[action]
-            degree %= 360
+            # degree += rotate[action]
+            # degree %= 360
+
+            degree = rotate[action]
 
             # 회전된 미로 그래픽 출력
             if ROTATION_MODE:
