@@ -21,7 +21,7 @@ MOVE_DELAY = 0.0
 USE_MAX_STEP = False
 
 
-# 0: 길, 1: 벽, 2: 도착지, 3: 플레이어(?)
+# 0: 길, 1: 벽, 2: 도착지, 3: 플레이어(?), 4: 지나온 길
 class Room:
     def __init__(self, r, c):
         self.r, self.c = r, c
