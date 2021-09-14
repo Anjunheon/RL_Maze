@@ -15,13 +15,13 @@ from tensorflow.keras.initializers import RandomUniform
 import pprint
 
 PLAY_MODE = 0
-ROTATION_MODE = True  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.5
-MOVE_DELAY = 0.5
+ROTATION_MODE = False  # 미로 회전 그래픽 출력
+ROTATE_DELAY = 0.0
+MOVE_DELAY = 0.0
 USE_MAX_STEP = False
 
 
-# 0: 지나지 않은 길, 1: 벽, 2: 도착지, 3: 피스, 4: 지나온 길
+# 0: 방문하지 않은 블럭, 1: 벽, 2: 도착지, 3: 피스, 4: 방문했던 블럭
 class Room:
     def __init__(self, r, c):
         self.r, self.c = r, c
@@ -111,8 +111,6 @@ def reset_maze():
         mazeMap[visited[0][i]][visited[1][i]] = 0
 
     mazeMap[destY][destX] = 2
-    pprint.pprint(mazeMap)
-    exit()
 
     rotate_maze(0)
     move_player(0)
@@ -247,9 +245,9 @@ class DQNAgent:
         self.epsilon_decay_step = 0.999
         self.max_step = 200
         self.batch_size = 32
-        self.train_start = 10000
+        self.train_start = 3000
         self.train_freq = 4
-        self.update_target_rate = 10
+        self.update_target_rate = 30
 
         # 리플레이 메모리, 최대 크기 2000
         self.memory = deque(maxlen=100000)
@@ -403,7 +401,8 @@ def move():
             if ROTATION_MODE:
                 rotate_maze(degree)
 
-            mazeMap[posY][posX] = 4
+            if mazeMap[posY][posX] != 4:
+                mazeMap[posY][posX] = 4
 
             if degree == 0:
                 if posY + 1 < rsize * 2 + 1:
@@ -423,16 +422,34 @@ def move():
                         posX -= 1
             # print(posY, posX)
 
+            # 도착지점 도착 시
             if mazeMap[posY][posX] == 2:
+                # 도착지점을 피스 정보로 표시
                 mazeMap[posY][posX] = 3
+
+                # 도착지점을 다른 정보로 표시(플레이어 움직일 때 오류 발생)
+                # mazeMap[posY][posX] = 5
+
                 move_player(degree)
                 # mazeMap[posY][posX] = 2
 
                 done = True
-                reward = 10
+                reward = 0.01
 
             if not done:
+                # 이전에 방문했던 블럭 재방문 시
+                if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
+                    # 중간보상 방식
+                    reward += -0.002
+
+                    # 에피소드 종료 방식
+                    # reward = -1
+                    # done = True
+                else:
+                    reward += 0.01
+
                 mazeMap[posY][posX] = 3
+
                 if ROTATION_MODE:
                     move_player(degree)
                 else:
@@ -457,7 +474,7 @@ def move():
                 # reward = -((np.abs(destX-posX) + np.abs(destY-posY))) / 10
             # print(reward)
 
-            pprint.pprint(mazeMap)
+            # pprint.pprint(mazeMap)
             # time.sleep(1)
 
             # 각 타임스텝마다 상태 전처리
@@ -477,12 +494,12 @@ def move():
                 if step % agent.train_freq == 0:
                     agent.train_model()
                     # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
-                    # if global_step % agent.update_target_rate == 0:
-                    #     agent.update_target_model()
+                    if global_step % agent.update_target_rate == 0:
+                        agent.update_target_model()
 
             if done:
                 # 각 에피소드마다 타깃 모델을 모델의 가중치로 업데이트
-                agent.update_target_model()
+                # agent.update_target_model()
 
                 # 각 에피소드 당 학습 정보를 기록
                 if global_step > agent.train_start:
@@ -559,8 +576,12 @@ def generate():
     tk.mainloop()
 
 
-rsize = 3
-csize = 3
+# 미로 크기 설정(홀수)
+rsize = 7
+csize = 7
+
+rsize = int(rsize/2)
+csize = int(csize/2)
 
 maze = []
 mazeMap = []
