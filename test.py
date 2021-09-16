@@ -89,7 +89,7 @@ def reset_maze():
     global maze, mazeMap, visit, p_maze
     global done
     global p_x, p_y
-    global player, ball
+    global ball, star
     global destY, destX
 
     # mazeMap[posY][posX] = 2
@@ -129,7 +129,7 @@ def rotate_maze(degree):
     global posX, posY
     global maze, mazeMap, visit
     global p_maze
-    global player, ball
+    global ball, star
     global p_x, p_y
 
     canvas.delete('all')
@@ -156,16 +156,16 @@ def rotate_maze(degree):
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
                                         width='5')
             elif p_maze[i][j] == 2:
-                ball.place(x=j * 50 + 10, y=i * 50 + 10)
-                ball.configure()
+                star.place(x=j * 50 + 5, y=i * 50 + 5)
+                star.configure()
 
     # 플레이어 y 좌표
     p_y = np.where(p_maze == 3)[0][0]
     # 플레이어 x 좌표
     p_x = np.where(p_maze == 3)[1][0]
 
-    player.place(x=p_x * 50 + 5, y=p_y * 50 + 5)
-    player.configure()
+    ball.place(x=p_x * 50 + 7, y=p_y * 50 + 7)
+    ball.configure()
 
     canvas.pack()
     tk.update()
@@ -177,7 +177,7 @@ def move_player(degree):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global p_maze
-    global player, ball
+    global ball, star
     global p_x, p_y
 
     if ROTATION_MODE:
@@ -198,8 +198,8 @@ def move_player(degree):
     # 플레이어 x 좌표
     p_x = np.where(p_maze == 3)[1][0]
 
-    player.place(x=p_x * 50 + 5, y=p_y * 50 + 5)
-    player.configure()
+    ball.place(x=p_x * 50 + 7, y=p_y * 50 + 7)
+    ball.configure()
 
     canvas.pack()
     tk.update()
@@ -210,16 +210,16 @@ def move_player(degree):
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
-        self.conv1 = Conv2D(8, (4, 4), strides=(2, 2), activation='relu',
-                            input_shape=state_size)
-        self.conv2 = Conv2D(16, (2, 2), strides=(1, 1), activation='relu')
+        # self.conv1 = Conv2D(8, (4, 4), strides=(2, 2), activation='relu',
+        #                     input_shape=state_size)
+        # self.conv2 = Conv2D(16, (2, 2), strides=(1, 1), activation='relu')
         self.flatten = Flatten()
-        self.fc = Dense(64, activation='relu')
+        self.fc = Dense(128, activation='relu')
         self.fc_out = Dense(action_size)
 
     def call(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
+        # x = self.conv1(x)
+        # x = self.conv2(x)
         x = self.flatten(x)
         x = self.fc(x)
         q = self.fc_out(x)
@@ -245,8 +245,8 @@ class DQNAgent:
         self.epsilon_decay_step = 0.999
         self.max_step = 200
         self.batch_size = 32
-        self.train_start = 3000
-        self.train_freq = 4
+        self.train_start = 5000
+        self.train_freq = 5
         self.update_target_rate = 30
 
         # 리플레이 메모리, 최대 크기 2000
@@ -348,7 +348,7 @@ def move():
     global tk, canvas
     global mazeMap, visit
     global done
-    global player
+    global ball
 
     agent = DQNAgent(action_size=4, state_size=(1, rsize * 2 + 1, csize * 2 + 1, 1))
 
@@ -391,11 +391,11 @@ def move():
             action = agent.get_action(np.float32(state))
 
             # 현재 각도 기준으로 회전
-            degree += rotate[action]
-            degree %= 360
+            # degree += rotate[action]
+            # degree %= 360
 
             # 초기 미로 각도 기준 회전 각도 설정
-            # degree = rotate[action]
+            degree = rotate[action]
 
             # 회전된 미로 그래픽 출력
             if ROTATION_MODE:
@@ -434,27 +434,27 @@ def move():
                 # mazeMap[posY][posX] = 2
 
                 done = True
-                reward = 0.01
+                reward = 1
 
             if not done:
                 # 이전에 방문했던 블럭 재방문 시
-                if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
-                    # 중간보상 방식
-                    reward += -0.002
-
-                    # 에피소드 종료 방식
-                    # reward = -1
-                    # done = True
-                else:
-                    reward += 0.01
+                # if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
+                #     # 중간보상 방식
+                #     reward += -0.002
+                #
+                #     # 에피소드 종료 방식
+                #     # reward = -1
+                #     # done = True
+                # else:
+                #     reward += 0.01
 
                 mazeMap[posY][posX] = 3
 
                 if ROTATION_MODE:
                     move_player(degree)
                 else:
-                    player.place(x=posX * 50 + 5, y=posY * 50 + 5)
-                    player.configure()
+                    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
+                    ball.configure()
 
                     canvas.pack()
                     tk.update()
@@ -535,7 +535,7 @@ def generate():
     global rsize, csize
     global tk, canvas
     global posX, posY
-    global player, ball
+    global ball, star
 
     tk = tkinter.Tk()
     tk.title('Maze Map')
@@ -547,26 +547,28 @@ def generate():
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
                                         width='5')
             elif mazeMap[i][j] == 2:
-                img = tkinter.PhotoImage(file='ball.png').subsample(25)
+                # img = tkinter.PhotoImage(file='ball.png').subsample(25)
+                img = tkinter.PhotoImage(file='star.png').subsample(7)
                 img.zoom(50, 50)
 
-                ball = tkinter.Label(image=img, borderwidth=0)
-                ball.image = img
-                ball.place(x=j * 50 + 10, y=i * 50 + 10)
-                ball.configure()
+                star = tkinter.Label(image=img, borderwidth=0)
+                star.image = img
+                star.place(x=j * 50 + 5, y=i * 50 + 5)
+                star.configure()
 
     visit[posY][posX] = 1
     mazeMap[posY][posX] = 3
 
     p_maze = mazeMap
 
-    img = tkinter.PhotoImage(file='player.png').subsample(6)
+    # img = tkinter.PhotoImage(file='player.png').subsample(6)
+    img = tkinter.PhotoImage(file='ball.png').subsample(25)
     img.zoom(50, 50)
 
-    player = tkinter.Label(image=img, borderwidth=0)
-    player.image = img
-    player.place(x=posX * 50 + 5, y=posY * 50 + 5)
-    player.configure()
+    ball = tkinter.Label(image=img, borderwidth=0)
+    ball.image = img
+    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
+    ball.configure()
 
     canvas.pack()
 
@@ -600,8 +602,8 @@ destY = 0
 tk = ''
 canvas = ''
 
-player = ''
 ball = ''
+star = ''
 
 # action_size = 4
 # state_size = (1, rsize*2+1, csize*2+1, 1)
