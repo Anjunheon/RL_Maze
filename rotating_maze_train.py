@@ -9,7 +9,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 from collections import deque
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D
+from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D, Dropout
 from tensorflow.keras.initializers import RandomUniform
 
 import pprint
@@ -21,7 +21,7 @@ MOVE_DELAY = 0.0
 USE_MAX_STEP = False
 
 
-# 0: 길, 1: 벽, 2: 도착지, 3: 플레이어(?), 4: 지나온 길
+# 0: 방문하지 않은 블럭, 1: 벽, 2: 도착지, 3: 피스, 4: 방문했던 블럭
 class Room:
     def __init__(self, r, c):
         self.r, self.c = r, c
@@ -78,7 +78,7 @@ def make_maze():
             continue
         mazeMap[r][-1] = 2
         destY = r
-        destX = np.shape(mazeMap)[1]-1
+        destX = np.shape(mazeMap)[1] - 1
         # print(destX, destY)
         break
 
@@ -89,7 +89,8 @@ def reset_maze():
     global maze, mazeMap, visit, p_maze
     global done
     global p_x, p_y
-    global player, ball
+    global ball, star
+    global destY, destX
 
     # mazeMap[posY][posX] = 2
 
@@ -104,6 +105,12 @@ def reset_maze():
     visit = np.zeros(np.shape(mazeMap))
     visit[posY][posX] = 1
     mazeMap[posY][posX] = 3
+
+    visited = np.where(np.array(mazeMap) == 4)
+    for i in range(0, len(visited[0])):
+        mazeMap[visited[0][i]][visited[1][i]] = 0
+
+    mazeMap[destY][destX] = 2
 
     rotate_maze(0)
     move_player(0)
@@ -122,7 +129,7 @@ def rotate_maze(degree):
     global posX, posY
     global maze, mazeMap, visit
     global p_maze
-    global player, ball
+    global ball, star
     global p_x, p_y
 
     canvas.delete('all')
@@ -146,18 +153,19 @@ def rotate_maze(degree):
     for i, r in enumerate(p_maze):
         for j, c in enumerate(r):
             if p_maze[i][j] == 1:
-                canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1', width='5')
+                canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
+                                        width='5')
             elif p_maze[i][j] == 2:
-                ball.place(x=j*50+10, y=i*50+10)
-                ball.configure()
+                star.place(x=j * 50 + 5, y=i * 50 + 5)
+                star.configure()
 
     # 플레이어 y 좌표
     p_y = np.where(p_maze == 3)[0][0]
     # 플레이어 x 좌표
     p_x = np.where(p_maze == 3)[1][0]
 
-    player.place(x=p_x * 50 + 5, y=p_y * 50 + 5)
-    player.configure()
+    ball.place(x=p_x * 50 + 7, y=p_y * 50 + 7)
+    ball.configure()
 
     canvas.pack()
     tk.update()
@@ -169,7 +177,7 @@ def move_player(degree):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global p_maze
-    global player, ball
+    global ball, star
     global p_x, p_y
 
     if ROTATION_MODE:
@@ -190,8 +198,8 @@ def move_player(degree):
     # 플레이어 x 좌표
     p_x = np.where(p_maze == 3)[1][0]
 
-    player.place(x=p_x * 50 + 5, y=p_y * 50 + 5)
-    player.configure()
+    ball.place(x=p_x * 50 + 7, y=p_y * 50 + 7)
+    ball.configure()
 
     canvas.pack()
     tk.update()
@@ -202,24 +210,26 @@ def move_player(degree):
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
-        self.conv1 = Conv2D(8, (4, 4), strides=(2, 2), activation='relu',
-                            input_shape=state_size)
-        self.conv2 = Conv2D(16, (2, 2), strides=(1, 1), activation='relu')
-        self.flatten = Flatten()
-        self.fc = Dense(64, activation='relu')
+        # self.conv1 = Conv2D(8, (4, 4), strides=(2, 2), activation='relu',
+        #                     input_shape=state_size)
+        # self.conv2 = Conv2D(16, (2, 2), strides=(1, 1), activation='relu')
+        self.flatten = Flatten(input_shape=state_size)
+        self.fc = Dense(256, activation='relu')
+        self.dropout = Dropout(0.2)
         self.fc_out = Dense(action_size)
 
     def call(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
+        # x = self.conv1(x)
+        # x = self.conv2(x)
         x = self.flatten(x)
+        x = self.dropout(x)
         x = self.fc(x)
         q = self.fc_out(x)
         return q
 
 
 class DQNAgent:
-    def __init__(self, action_size=4, state_size=(1, 2*2+1, 2*2+1, 1)):
+    def __init__(self, action_size=4, state_size=(1, 2 * 2 + 1, 2 * 2 + 1, 1)):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -237,9 +247,9 @@ class DQNAgent:
         self.epsilon_decay_step = 0.999
         self.max_step = 200
         self.batch_size = 32
-        self.train_start = 10000
-        self.train_freq = 4
-        self.update_target_rate = 10
+        self.train_start = 5000
+        self.train_freq = 5
+        self.update_target_rate = 30
 
         # 리플레이 메모리, 최대 크기 2000
         self.memory = deque(maxlen=100000)
@@ -267,7 +277,7 @@ class DQNAgent:
     def get_action(self, history):
         history = np.float32(history)
         if np.random.rand() <= self.epsilon:
-            return random.randint(0, self.action_size-1)
+            return random.randint(0, self.action_size - 1)
         else:
             q_value = self.model.call(history)
             return np.argmax(q_value)
@@ -298,13 +308,13 @@ class DQNAgent:
         # history = np.array([sample[0][0] for sample in batch],
         #                    dtype=np.float32)
         state = np.array([sample[0][0] for sample in batch],
-                             dtype=np.float32)
+                         dtype=np.float32)
         actions = np.array([sample[1] for sample in batch])
         rewards = np.array([sample[2] for sample in batch])
         next_history = np.array([sample[3][0] for sample in batch],
                                 dtype=np.float32)
         next_state = np.array([sample[3] for sample in batch],
-                                dtype=np.float32)
+                              dtype=np.float32)
         dones = np.array([[sample[4]] for sample in batch])
 
         # 학습 파라미터
@@ -340,12 +350,12 @@ def move():
     global tk, canvas
     global mazeMap, visit
     global done
-    global player
+    global ball
 
-    agent = DQNAgent(action_size=4, state_size=(1, rsize*2+1, csize*2+1, 1))
+    agent = DQNAgent(action_size=4, state_size=(1, rsize * 2 + 1, csize * 2 + 1, 1))
 
-    agent.model.build(input_shape=(1, rsize*2+1, csize*2+1, 1))
-    agent.target_model.build(input_shape=(1, rsize*2+1, csize*2+1, 1))
+    agent.model.build(input_shape=(1, rsize * 2 + 1, csize * 2 + 1, 1))
+    agent.target_model.build(input_shape=(1, rsize * 2 + 1, csize * 2 + 1, 1))
 
     agent.model.summary()
     agent.target_model.summary()
@@ -371,7 +381,7 @@ def move():
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
         state = np.float32(mazeMap)
-        state = np.reshape([state], (1, rsize*2+1, csize*2+1, 1))
+        state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
 
         while not done:
             # time.sleep(2)
@@ -381,53 +391,72 @@ def move():
             # 바로 전 history를 입력으로 받아 행동을 선택
             # 0: 위, 1: 아래, 2: 오른쪽, 3: 왼쪽
             action = agent.get_action(np.float32(state))
-            
+
             # 현재 각도 기준으로 회전
-            degree += rotate[action]
-            degree %= 360
+            # degree += rotate[action]
+            # degree %= 360
 
             # 초기 미로 각도 기준 회전 각도 설정
-            # degree = rotate[action]
+            degree = rotate[action]
 
             # 회전된 미로 그래픽 출력
             if ROTATION_MODE:
                 rotate_maze(degree)
 
-            mazeMap[posY][posX] = 0
+            if mazeMap[posY][posX] != 4:
+                mazeMap[posY][posX] = 4
 
             if degree == 0:
-                if posY+1 < rsize*2+1:
-                    if mazeMap[posY+1][posX] != 1:
+                if posY + 1 < rsize * 2 + 1:
+                    if mazeMap[posY + 1][posX] != 1:
                         posY += 1
             elif degree == 90:
-                if posX+1 < csize*2+1:
-                    if mazeMap[posY][posX+1] != 1:
+                if posX + 1 < csize * 2 + 1:
+                    if mazeMap[posY][posX + 1] != 1:
                         posX += 1
             elif degree == 180:
-                if posY-1 >= 0:
-                    if mazeMap[posY-1][posX] != 1:
+                if posY - 1 >= 0:
+                    if mazeMap[posY - 1][posX] != 1:
                         posY -= 1
             elif degree == 270:
-                if posX-1 >= 0:
-                    if mazeMap[posY][posX-1] != 1:
+                if posX - 1 >= 0:
+                    if mazeMap[posY][posX - 1] != 1:
                         posX -= 1
             # print(posY, posX)
 
+            # 도착지점 도착 시
             if mazeMap[posY][posX] == 2:
+                # 도착지점을 피스 정보로 표시
                 mazeMap[posY][posX] = 3
+
+                # 도착지점을 다른 정보로 표시(플레이어 움직일 때 오류 발생)
+                # mazeMap[posY][posX] = 5
+
                 move_player(degree)
-                mazeMap[posY][posX] = 2
+                # mazeMap[posY][posX] = 2
 
                 done = True
-                reward = 10
+                reward = 1
 
             if not done:
+                # 이전에 방문했던 블럭 재방문 시
+                # if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
+                #     # 중간보상 방식
+                #     reward += -0.002
+                #
+                #     # 에피소드 종료 방식
+                #     # reward = -1
+                #     # done = True
+                # else:
+                #     reward += 0.01
+
                 mazeMap[posY][posX] = 3
+
                 if ROTATION_MODE:
                     move_player(degree)
                 else:
-                    player.place(x=posX * 50 + 5, y=posY * 50 + 5)
-                    player.configure()
+                    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
+                    ball.configure()
 
                     canvas.pack()
                     tk.update()
@@ -439,17 +468,20 @@ def move():
                         reward = -1
                         done = True
                 # else:
-                    # reward = -1 / 400 + ((np.abs(destX-posX) + np.abs(destY-posY))) / 10000
-                    # reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 10, 3)
-                    # reward = -1 / ((np.abs(destX-posX) + np.abs(destY-posY) + 0.001))
-                    # reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 8, 2) + 0.5
-                    # reward += -round(1 / 900, 3)
-                    # reward = -((np.abs(destX-posX) + np.abs(destY-posY))) / 10
+                # reward = -1 / 400 + ((np.abs(destX-posX) + np.abs(destY-posY))) / 10000
+                # reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 10, 3)
+                # reward = -1 / ((np.abs(destX-posX) + np.abs(destY-posY) + 0.001))
+                # reward = -round((np.abs(destX-posX) + np.abs(destY-posY)) / 8, 2) + 0.5
+                # reward += -round(1 / 900, 3)
+                # reward = -((np.abs(destX-posX) + np.abs(destY-posY))) / 10
             # print(reward)
+
+            # pprint.pprint(mazeMap)
+            # time.sleep(1)
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32(mazeMap)
-            next_state = np.reshape([next_state], (1, rsize*2+1, csize*2+1, 1))
+            next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
 
             # 가장 큰 Q값 가산
             agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
@@ -464,12 +496,12 @@ def move():
                 if step % agent.train_freq == 0:
                     agent.train_model()
                     # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
-                    # if global_step % agent.update_target_rate == 0:
-                    #     agent.update_target_model()
+                    if global_step % agent.update_target_rate == 0:
+                        agent.update_target_model()
 
             if done:
                 # 각 에피소드마다 타깃 모델을 모델의 가중치로 업데이트
-                agent.update_target_model()
+                # agent.update_target_model()
 
                 # 각 에피소드 당 학습 정보를 기록
                 if global_step > agent.train_start:
@@ -505,7 +537,7 @@ def generate():
     global rsize, csize
     global tk, canvas
     global posX, posY
-    global player, ball
+    global ball, star
 
     tk = tkinter.Tk()
     tk.title('Maze Map')
@@ -514,28 +546,31 @@ def generate():
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             if mazeMap[i][j] == 1:
-                canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1', width='5')
+                canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
+                                        width='5')
             elif mazeMap[i][j] == 2:
-                img = tkinter.PhotoImage(file='ball.png').subsample(25)
+                # img = tkinter.PhotoImage(file='ball.png').subsample(25)
+                img = tkinter.PhotoImage(file='star.png').subsample(7)
                 img.zoom(50, 50)
 
-                ball = tkinter.Label(image=img, borderwidth=0)
-                ball.image = img
-                ball.place(x=j*50+10, y=i*50+10)
-                ball.configure()
+                star = tkinter.Label(image=img, borderwidth=0)
+                star.image = img
+                star.place(x=j * 50 + 5, y=i * 50 + 5)
+                star.configure()
 
     visit[posY][posX] = 1
     mazeMap[posY][posX] = 3
 
     p_maze = mazeMap
 
-    img = tkinter.PhotoImage(file='player.png').subsample(6)
+    # img = tkinter.PhotoImage(file='player.png').subsample(6)
+    img = tkinter.PhotoImage(file='ball.png').subsample(25)
     img.zoom(50, 50)
 
-    player = tkinter.Label(image=img, borderwidth=0)
-    player.image = img
-    player.place(x=posX * 50 + 5, y=posY * 50 + 5)
-    player.configure()
+    ball = tkinter.Label(image=img, borderwidth=0)
+    ball.image = img
+    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
+    ball.configure()
 
     canvas.pack()
 
@@ -545,8 +580,12 @@ def generate():
     tk.mainloop()
 
 
-rsize = 3
-csize = 3
+# 미로 크기 설정(홀수)
+rsize = 7
+csize = 7
+
+rsize = int(rsize/2)
+csize = int(csize/2)
 
 maze = []
 mazeMap = []
@@ -565,8 +604,8 @@ destY = 0
 tk = ''
 canvas = ''
 
-player = ''
 ball = ''
+star = ''
 
 # action_size = 4
 # state_size = (1, rsize*2+1, csize*2+1, 1)
