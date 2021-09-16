@@ -9,15 +9,15 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 from collections import deque
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D
+from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D, Dropout
 from tensorflow.keras.initializers import RandomUniform
 
 import pprint
 
 PLAY_MODE = 0
 ROTATION_MODE = False  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.0
-MOVE_DELAY = 0.0
+ROTATE_DELAY = 0.5
+MOVE_DELAY = 0.5
 USE_MAX_STEP = False
 
 
@@ -123,7 +123,7 @@ def reset_maze():
 
 
 def rotate_maze(degree):
-    global ROTATE_DELAY
+    global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global rsize, csize
     global posX, posY
@@ -134,41 +134,52 @@ def rotate_maze(degree):
 
     canvas.delete('all')
 
-    # 회전된 미로 그래픽 출력
-    if degree == 0:
-        p_maze = np.array(mazeMap)
-    elif degree == 90:
-        p_maze = np.array(list(map(list, zip(*mazeMap[::-1]))))
-    elif degree == 180:
-        p_maze = np.array(list(map(list, zip(*mazeMap[::-1]))))
-        p_maze = np.array(list(map(list, zip(*p_maze[::-1]))))
-    elif degree == 270:
-        p_maze = np.array(list(map(list, zip(*mazeMap)))[::-1])
+    if not ROTATION_MODE:
+        if degree == 0:
+            mazeMap = np.array(mazeMap)
+        elif 360-degree == 90:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+        elif 360-degree == 180:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+            mazeMap = np.array(list(map(list, zip(*p_maze[::-1]))))
+        elif 360-degree == 270:
+            mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
 
-    for i, r in enumerate(p_maze):
+    for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#242C2E', outline='#242C2E',
                                     width='5')
 
-    for i, r in enumerate(p_maze):
+    for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
-            if p_maze[i][j] == 1:
+            if mazeMap[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
                                         width='5')
-            elif p_maze[i][j] == 2:
+            elif mazeMap[i][j] == 2:
                 star.place(x=j * 50 + 5, y=i * 50 + 5)
                 star.configure()
 
     # 플레이어 y 좌표
-    p_y = np.where(p_maze == 3)[0][0]
+    posY = np.where(mazeMap == 3)[0][0]
     # 플레이어 x 좌표
-    p_x = np.where(p_maze == 3)[1][0]
+    posX = np.where(mazeMap == 3)[1][0]
 
-    ball.place(x=p_x * 50 + 7, y=p_y * 50 + 7)
+    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
     ball.configure()
 
     canvas.pack()
     tk.update()
+
+    if not ROTATION_MODE:
+        if degree == 0:
+            mazeMap = np.array(mazeMap)
+        elif degree == 90:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+        elif degree == 180:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+            mazeMap = np.array(list(map(list, zip(*p_maze[::-1]))))
+        elif degree == 270:
+            mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
 
     time.sleep(ROTATE_DELAY)
 
@@ -176,33 +187,43 @@ def rotate_maze(degree):
 def move_player(degree):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
-    global p_maze
+    global mazeMap, p_maze
     global ball, star
     global p_x, p_y
+    global posX, posY
 
-    if ROTATION_MODE:
+    if not ROTATION_MODE:
         if degree == 0:
-            p_maze = np.array(mazeMap)
-        elif degree == 90:
-            p_maze = np.array(list(map(list, zip(*mazeMap[::-1]))))
-        elif degree == 180:
-            p_maze = np.array(list(map(list, zip(*mazeMap[::-1]))))
-            p_maze = np.array(list(map(list, zip(*p_maze[::-1]))))
-        elif degree == 270:
-            p_maze = np.array(list(map(list, zip(*mazeMap)))[::-1])
-    else:
-        p_maze = np.array(mazeMap)
+            mazeMap = np.array(mazeMap)
+        elif 360-degree == 90:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+        elif 360-degree == 180:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+            mazeMap = np.array(list(map(list, zip(*p_maze[::-1]))))
+        elif 360-degree == 270:
+            mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
 
     # 플레이어 y 좌표
-    p_y = np.where(p_maze == 3)[0][0]
+    posY = np.where(mazeMap == 3)[0][0]
     # 플레이어 x 좌표
-    p_x = np.where(p_maze == 3)[1][0]
+    posX = np.where(mazeMap == 3)[1][0]
 
-    ball.place(x=p_x * 50 + 7, y=p_y * 50 + 7)
+    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
     ball.configure()
 
     canvas.pack()
     tk.update()
+
+    if not ROTATION_MODE:
+        if degree == 0:
+            mazeMap = np.array(mazeMap)
+        elif degree == 90:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+        elif degree == 180:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+            mazeMap = np.array(list(map(list, zip(*p_maze[::-1]))))
+        elif degree == 270:
+            mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
 
     time.sleep(MOVE_DELAY)
 
@@ -213,14 +234,16 @@ class DQN(tf.keras.Model):
         # self.conv1 = Conv2D(8, (4, 4), strides=(2, 2), activation='relu',
         #                     input_shape=state_size)
         # self.conv2 = Conv2D(16, (2, 2), strides=(1, 1), activation='relu')
-        self.flatten = Flatten()
-        self.fc = Dense(128, activation='relu')
+        self.flatten = Flatten(input_shape=state_size)
+        self.fc = Dense(256, activation='relu')
+        self.dropout = Dropout(0.2)
         self.fc_out = Dense(action_size)
 
     def call(self, x):
         # x = self.conv1(x)
         # x = self.conv2(x)
         x = self.flatten(x)
+        x = self.dropout(x)
         x = self.fc(x)
         q = self.fc_out(x)
         return q
@@ -245,9 +268,9 @@ class DQNAgent:
         self.epsilon_decay_step = 0.999
         self.max_step = 200
         self.batch_size = 32
-        self.train_start = 5000
+        self.train_start = 2000
         self.train_freq = 5
-        self.update_target_rate = 30
+        self.update_target_rate = 10
 
         # 리플레이 메모리, 최대 크기 2000
         self.memory = deque(maxlen=100000)
@@ -382,7 +405,7 @@ def move():
         state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
 
         while not done:
-            # time.sleep(2)
+            # time.sleep(1)
             global_step += 1
             step += 1
 
@@ -391,36 +414,39 @@ def move():
             action = agent.get_action(np.float32(state))
 
             # 현재 각도 기준으로 회전
-            # degree += rotate[action]
-            # degree %= 360
+            degree += rotate[action]
+            degree %= 360
 
             # 초기 미로 각도 기준 회전 각도 설정
-            degree = rotate[action]
+            # degree = rotate[action]
 
             # 회전된 미로 그래픽 출력
-            if ROTATION_MODE:
-                rotate_maze(degree)
+            # if ROTATION_MODE:
+            #     rotate_maze(degree)
+
+            if degree == 0:
+                mazeMap = np.array(mazeMap)
+            elif degree == 90:
+                mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+            elif degree == 180:
+                mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+                mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+            elif degree == 270:
+                mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
+
+            # 플레이어 y 좌표
+            posY = np.where(mazeMap == 3)[0][0]
+            # 플레이어 x 좌표
+            posX = np.where(mazeMap == 3)[1][0]
+
+            rotate_maze(degree)
 
             if mazeMap[posY][posX] != 4:
                 mazeMap[posY][posX] = 4
 
-            if degree == 0:
-                if posY + 1 < rsize * 2 + 1:
-                    if mazeMap[posY + 1][posX] != 1:
-                        posY += 1
-            elif degree == 90:
-                if posX + 1 < csize * 2 + 1:
-                    if mazeMap[posY][posX + 1] != 1:
-                        posX += 1
-            elif degree == 180:
-                if posY - 1 >= 0:
-                    if mazeMap[posY - 1][posX] != 1:
-                        posY -= 1
-            elif degree == 270:
-                if posX - 1 >= 0:
-                    if mazeMap[posY][posX - 1] != 1:
-                        posX -= 1
-            # print(posY, posX)
+            if posY + 1 < rsize * 2 + 1:
+                if mazeMap[posY + 1][posX] != 1:
+                    posY += 1
 
             # 도착지점 도착 시
             if mazeMap[posY][posX] == 2:
@@ -450,14 +476,9 @@ def move():
 
                 mazeMap[posY][posX] = 3
 
-                if ROTATION_MODE:
-                    move_player(degree)
-                else:
-                    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
-                    ball.configure()
+                move_player(degree)
 
-                    canvas.pack()
-                    tk.update()
+            # pprint.pprint(mazeMap)
 
             # 중간 보상 : 맨해튼 거리
             if not done:
