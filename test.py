@@ -8,7 +8,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import tensorflow as tf
 from collections import deque
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, RMSprop
 from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D, Dropout
 from tensorflow.keras.initializers import RandomUniform
 
@@ -240,24 +240,36 @@ def move_player(acc_deg):
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
-        self.flatten = Flatten(input_shape=state_size)
-        self.flatten2 = Flatten()
-        self.fc = Dense(256, activation='relu')
-        self.dropout = Dropout(0.2)
-        self.fc_out = Dense(action_size)
+        # self.conv = Conv2D(32, (1, 1), strides=(1, 1), activation='relu', input_shape=state_size)
+        # self.flatten = Flatten()
+        # self.fc = Dense(64, activation='relu')
+        # self.dropout = Dropout(0.5)
+        # self.fc_out = Dense(action_size)
+
+        self.fc1 = Dense(32, activation='tanh', input_shape=state_size)
+        self.flatten = Flatten()
+        self.fc2 = Dense(32, activation='tanh')
+        self.fc3 = Dense(64, activation='tanh')
+        self.fc_out = Dense(action_size, activation='linear')
+
 
     def call(self, x):
+        # x = self.conv(x)
+        # x = self.flatten(x)
+        # x = self.dropout(x)
+        # x = self.fc(x)
+        # q = self.fc_out(x)
+
+        x = self.fc1(x)
         x = self.flatten(x)
-        x = self.flatten2(x)
-        x = self.dropout(x)
-        x = self.fc(x)
+        x = self.fc2(x)
+        x = self.fc3(x)
         q = self.fc_out(x)
         return q
 
 
 class DQNAgent:
-    # def __init__(self, action_size=3, state_size=(1, 2 * 2 + 1, 2 * 2 + 1, 1)):
-    def __init__(self, action_size=3, state_size=(1, 7, 7)):
+    def __init__(self, action_size=3, state_size=(None, 2 * 2 + 1, 2 * 2 + 1, 1)):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -272,7 +284,7 @@ class DQNAgent:
         # self.exploration_steps = 1000000.
         # self.epsilon_decay_step = self.epsilon_start - self.epsilon_end
         # self.epsilon_decay_step /= self.exploration_steps
-        self.epsilon_decay_step = 0.999
+        self.epsilon_decay_step = 0.99
         self.max_step = 200
         self.batch_size = 32
         self.train_start = 5000
@@ -287,7 +299,9 @@ class DQNAgent:
         # 모델과 타깃 모델 생성
         self.model = DQN(action_size, state_size)
         self.target_model = DQN(action_size, state_size)
-        self.optimizer = Adam(self.learning_rate, clipnorm=10.)
+        self.optimizer = Adam(self.learning_rate, clipnorm=1.)
+
+        # self.optimizer = RMSprop(self.learning_rate, clipnorm=10.1)
 
         # 타깃 모델 초기화
         self.update_target_model()
@@ -363,6 +377,12 @@ class DQNAgent:
             # 1) 벨만 최적 방정식을 이용한 업데이트 타깃
             loss = tf.reduce_mean(tf.square(targets[0] - predicts))
 
+            # 2) 후버로스 계산
+            # error = tf.abs(targets[0] - predicts)
+            # quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
+            # linear_part = error - quadratic_part
+            # loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
+
             self.avg_loss += loss.numpy()
 
         # 오류함수를 줄이는 방향으로 모델 업데이트
@@ -380,15 +400,10 @@ def move():
     global done
     global ball
 
-    # agent = DQNAgent(action_size=3, state_size=(1, rsize * 2 + 1, csize * 2 + 1, 1))
-    #
-    # agent.model.build(input_shape=(1, rsize * 2 + 1, csize * 2 + 1, 1))
-    # agent.target_model.build(input_shape=(1, rsize * 2 + 1, csize * 2 + 1, 1))
+    agent = DQNAgent(action_size=3, state_size=(None, rsize * 2 + 1, csize * 2 + 1, 1))
 
-    agent = DQNAgent(action_size=3, state_size=(1, 7, 7))
-
-    agent.model.build(input_shape=(1, 7, 7))
-    agent.target_model.build(input_shape=(1, 7, 7))
+    agent.model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 1))
+    agent.target_model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 1))
 
     agent.model.summary()
     agent.target_model.summary()
@@ -413,8 +428,8 @@ def move():
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
         state = np.float32(mazeMap)
-        # state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
-        state = np.reshape([state], (1, 7, 7))
+        # state = np.float32(mazeMap) / 10.
+        state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
 
         while not done:
             # time.sleep(1)
@@ -467,19 +482,22 @@ def move():
                 # mazeMap[posY][posX] = 2
 
                 done = True
-                reward = 0.05
+                reward = 1
 
             if not done:
                 # 이전에 방문했던 블럭 재방문 시
-                if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
-                    # 중간보상 방식
-                    reward = -0.003
+                # if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
+                #     # 중간보상 방식
+                #     reward = -1
                 #
                 #     # 에피소드 종료 방식
                 #     # reward = -1
                 #     # done = True
-                else:
-                    reward = 0.001
+                # else:
+                #     reward = 0
+
+                # 스텝마다 - 보상
+                reward = -0.01
 
                 mazeMap[posY][posX] = 3
 
@@ -504,8 +522,8 @@ def move():
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32(mazeMap)
-            # next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
-            next_state = np.reshape([next_state], (1, 7, 7))
+            # next_state = np.float32(mazeMap) / 10.
+            next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
 
             # 가장 큰 Q값 가산
             agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
