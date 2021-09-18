@@ -1,6 +1,7 @@
 .idea/
 summary/
 save_model/
+__pycache__/
 
 create_maze_test.py
 
