@@ -250,7 +250,7 @@ class DQN(tf.keras.Model):
         self.flatten = Flatten()
         self.fc2 = Dense(32, activation='tanh')
         self.fc3 = Dense(64, activation='tanh')
-        self.fc_out = Dense(action_size, activation='linear')
+        self.fc_out = Dense(action_size, activation='softmax')
 
 
     def call(self, x):
