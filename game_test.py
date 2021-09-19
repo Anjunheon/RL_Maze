@@ -15,10 +15,10 @@ from tensorflow.keras.initializers import RandomUniform
 import pprint
 
 PLAY_MODE = 0
-GAME_SPEED = 100000000000000  # 1~10
+GAME_SPEED = 10  # 1~10
 ROTATION_MODE = False  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.3 / GAME_SPEED
-MOVE_DELAY = 0.3 / GAME_SPEED
+ROTATE_DELAY = 0.0 / GAME_SPEED
+MOVE_DELAY = 0.0 / GAME_SPEED
 USE_MAX_STEP = False
 
 
@@ -391,7 +391,7 @@ class DQNAgent:
         self.optimizer.apply_gradients(zip(grads, model_params))
 
 
-def move():
+def proceed():
     global ROTATION_MODE
     global rsize, csize
     global posX, posY
@@ -431,7 +431,7 @@ def move():
 
         ball_st = time.time()
         ball_et = time.time()
-        ball_move = 0.3 / GAME_SPEED  # 공 이동 시간 간격
+        ball_move = 0.2 / GAME_SPEED  # 공 이동 시간 간격
 
         # 랜덤한(0.3~0.7초) 시간 마다 행동
         act_st = time.time()
@@ -454,7 +454,7 @@ def move():
                 action = agent.get_action(np.float32(state))
                 act_st = time.time()
                 act_et = time.time()
-                act_t = 0.1 / GAME_SPEED
+                # act_t = 0.1 / GAME_SPEED
                 act = True
 
                 global_step += 1
@@ -488,7 +488,7 @@ def move():
             if mazeMap[posY][posX] != 4:
                 mazeMap[posY][posX] = 4
 
-            # 0.5초 마다 공 이동
+            # 공 이동
             if ball_et - ball_st >= ball_move or act:
             # if ball_et - ball_st >= ball_move:
                 if posY + 1 < rsize * 2 + 1:
@@ -646,7 +646,7 @@ def generate():
 
     canvas.pack()
 
-    tk.after(1000, move)
+    tk.after(1000, proceed)
 
     tk.focus_force()
     tk.mainloop()
