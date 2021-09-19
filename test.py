@@ -112,7 +112,7 @@ def reset_maze(acc_deg):
     mazeMap[destY][destX] = 2
 
     rotate_maze(acc_deg)
-    move_player(acc_deg)
+    move_ball(acc_deg)
 
     done = False
 
@@ -145,13 +145,13 @@ def rotate_maze(acc_deg):
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#242C2E', outline='#242C2E',
-                                    width='0')
+                                    width='3')
 
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             if mazeMap[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
-                                        width='0')
+                                        width='3')
             elif mazeMap[i][j] == 2:
                 dest.place(x=j * 50 + 5, y=i * 50 + 5)
                 dest.configure()
@@ -186,7 +186,7 @@ def rotate_maze(acc_deg):
     time.sleep(ROTATE_DELAY)
 
 
-def move_player(acc_deg):
+def move_ball(acc_deg):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global mazeMap
@@ -390,7 +390,7 @@ class DQNAgent:
         self.optimizer.apply_gradients(zip(grads, model_params))
 
 
-def move():
+def proceed():
     global ROTATION_MODE
     global rsize, csize
     global posX, posY
@@ -427,6 +427,10 @@ def move():
         done = False
 
         step, score = 0, 0
+
+        ball_st = time.time()
+        ball_et = time.time()
+        ball_move = 0.3  # 공 이동 시간 간격
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
         state = np.float32(mazeMap)
@@ -480,7 +484,7 @@ def move():
                 # 도착지점을 다른 정보로 표시(플레이어 움직일 때 오류 발생)
                 # mazeMap[posY][posX] = 5
 
-                move_player(acc_deg)
+                move_ball(acc_deg)
                 # mazeMap[posY][posX] = 2
 
                 done = True
@@ -503,7 +507,7 @@ def move():
 
                 mazeMap[posY][posX] = 3
 
-                move_player(acc_deg)
+                move_ball(acc_deg)
 
             # pprint.pprint(mazeMap)
 
@@ -602,7 +606,7 @@ def generate():
         for j, c in enumerate(r):
             if mazeMap[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
-                                        width='0')
+                                        width='3')
             elif mazeMap[i][j] == 2:
                 dest.place(x=j * 50 + 5, y=i * 50 + 5)
                 dest.configure()
@@ -614,7 +618,7 @@ def generate():
 
     canvas.pack()
 
-    tk.after(1000, move)
+    tk.after(1000, proceed)
 
     tk.focus_force()
     tk.mainloop()
