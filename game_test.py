@@ -288,19 +288,19 @@ class DQNAgent:
         self.epsilon_decay_step = 0.99
         self.max_step = 200
         self.batch_size = 32
-        self.train_start = 5000
-        self.train_freq = 5
-        self.update_target_rate = 20
+        self.train_start = 10000
+        self.train_freq = 1
+        self.update_target_rate = 500
 
-        # 리플레이 메모리, 최대 크기 2000
-        self.memory = deque(maxlen=20000)
+        # 리플레이 메모리, 최대 크기 100000
+        self.memory = deque(maxlen=100000)
         # 게임 시작 후 랜덤하게 움직이지 않는 것에 대한 옵션
         self.no_op_steps = 50
 
         # 모델과 타깃 모델 생성
         self.model = DQN(action_size, state_size)
         self.target_model = DQN(action_size, state_size)
-        self.optimizer = Adam(self.learning_rate, clipnorm=5.)
+        self.optimizer = Adam(self.learning_rate, clipnorm=1.0)
 
         # self.optimizer = RMSprop(self.learning_rate, clipnorm=10.1)
 
@@ -489,8 +489,8 @@ def proceed():
                 mazeMap[posY][posX] = 4
 
             # 공 이동
-            if ball_et - ball_st >= ball_move or act:
-            # if ball_et - ball_st >= ball_move:
+            # if ball_et - ball_st >= ball_move or act:
+            if ball_et - ball_st >= ball_move:
                 if posY + 1 < rsize * 2 + 1:
                     if mazeMap[posY + 1][posX] != 1:
                         posY += 1
@@ -510,7 +510,7 @@ def proceed():
                 # mazeMap[posY][posX] = 2
 
                 done = True
-                reward = 0.5
+                reward = 1
 
             if not done:
                 # 1) 이전에 방문했던 블럭 재방문 시
