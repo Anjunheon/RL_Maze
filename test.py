@@ -87,7 +87,7 @@ def reset_maze(acc_deg):
     global posX, posY
     global maze, mazeMap
     global done
-    global ball, star
+    global ball, dest
     global destY, destX
 
     posX = 1
@@ -124,7 +124,7 @@ def rotate_maze(acc_deg):
     global tk, canvas
     global posX, posY
     global maze, mazeMap
-    global ball, star
+    global ball, dest
 
     # print('rotate maze')
     # pprint.pprint(mazeMap)
@@ -145,23 +145,23 @@ def rotate_maze(acc_deg):
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#242C2E', outline='#242C2E',
-                                    width='5')
+                                    width='0')
 
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             if mazeMap[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
-                                        width='5')
+                                        width='0')
             elif mazeMap[i][j] == 2:
-                star.place(x=j * 50 + 5, y=i * 50 + 5)
-                star.configure()
+                dest.place(x=j * 50 + 5, y=i * 50 + 5)
+                dest.configure()
 
     # 플레이어 y 좌표
     posY = np.where(mazeMap == 3)[0][0]
     # 플레이어 x 좌표
     posX = np.where(mazeMap == 3)[1][0]
 
-    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
+    ball.place(x=posX * 50 + 5, y=posY * 50 + 3)
     ball.configure()
 
     canvas.pack()
@@ -190,7 +190,7 @@ def move_player(acc_deg):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global mazeMap
-    global ball, star
+    global ball, dest
     global posX, posY
 
     # print('move player')
@@ -212,7 +212,7 @@ def move_player(acc_deg):
     # 플레이어 x 좌표
     posX = np.where(mazeMap == 3)[1][0]
 
-    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
+    ball.place(x=posX * 50 + 5, y=posY * 50 + 3)
     ball.configure()
 
     canvas.pack()
@@ -250,7 +250,7 @@ class DQN(tf.keras.Model):
         self.flatten = Flatten()
         self.fc2 = Dense(32, activation='tanh')
         self.fc3 = Dense(64, activation='tanh')
-        self.fc_out = Dense(action_size, activation='softmax')
+        self.fc_out = Dense(action_size, activation='linear')
 
 
     def call(self, x):
@@ -299,7 +299,7 @@ class DQNAgent:
         # 모델과 타깃 모델 생성
         self.model = DQN(action_size, state_size)
         self.target_model = DQN(action_size, state_size)
-        self.optimizer = Adam(self.learning_rate, clipnorm=1.)
+        self.optimizer = Adam(self.learning_rate, clipnorm=5.)
 
         # self.optimizer = RMSprop(self.learning_rate, clipnorm=10.1)
 
@@ -399,6 +399,8 @@ def move():
     global mazeMap
     global done
     global ball
+
+    time.sleep(1)
 
     agent = DQNAgent(action_size=3, state_size=(None, rsize * 2 + 1, csize * 2 + 1, 1))
 
@@ -580,36 +582,34 @@ def generate():
     global rsize, csize
     global tk, canvas
     global posX, posY
-    global ball, star
+    global ball, dest
 
     tk = tkinter.Tk()
     tk.title('Maze Map')
     canvas = tkinter.Canvas(width=(csize * 2 + 1) * 50, height=(rsize * 2 + 1) * 50, bg='#242C2E')
 
+    # img = tkinter.PhotoImage(file='ball.png').subsample(25)
+    # dest_img = tkinter.PhotoImage(file='images/star.png').subsample(7)
+    # dest_img = tkinter.PhotoImage(file='images/star2.png')
+    dest_img = tkinter.PhotoImage(file='images/dest.png')
+    dest = tkinter.Label(image=dest_img, borderwidth=0)
+
+    # ball_img = tkinter.PhotoImage(file='images/ball.png').subsample(25)
+    ball_img = tkinter.PhotoImage(file='images/ball2.png')
+    ball = tkinter.Label(image=ball_img, borderwidth=0)
+
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             if mazeMap[i][j] == 1:
                 canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
-                                        width='5')
+                                        width='0')
             elif mazeMap[i][j] == 2:
-                # img = tkinter.PhotoImage(file='ball.png').subsample(25)
-                img = tkinter.PhotoImage(file='star.png').subsample(7)
-                img.zoom(50, 50)
-
-                star = tkinter.Label(image=img, borderwidth=0)
-                star.image = img
-                star.place(x=j * 50 + 5, y=i * 50 + 5)
-                star.configure()
+                dest.place(x=j * 50 + 5, y=i * 50 + 5)
+                dest.configure()
 
     mazeMap[posY][posX] = 3
 
-    # img = tkinter.PhotoImage(file='player.png').subsample(6)
-    img = tkinter.PhotoImage(file='ball.png').subsample(25)
-    img.zoom(50, 50)
-
-    ball = tkinter.Label(image=img, borderwidth=0)
-    ball.image = img
-    ball.place(x=posX * 50 + 7, y=posY * 50 + 7)
+    ball.place(x=posX * 50 + 5, y=posY * 50 + 3)
     ball.configure()
 
     canvas.pack()
@@ -640,7 +640,7 @@ tk = ''
 canvas = ''
 
 ball = ''
-star = ''
+dest = ''
 
 # action_size = 4
 # state_size = (1, rsize*2+1, csize*2+1, 1)
