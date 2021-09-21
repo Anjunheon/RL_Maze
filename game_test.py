@@ -29,7 +29,10 @@ rsize = int(rsize/2)
 csize = int(csize/2)
 
 # action_size = 4
+# 1) (4, x, x 1)
 state_size = (None, rsize*2+1, csize*2+1, 1)
+# 2) (1, x, x, 4)
+state_size = (None, rsize*2+1, csize*2+1, 4)
 
 
 # 0: 방문하지 않은 블럭, 1: 벽, 2: 도착지, 3: 피스, 4: 방문했던 블럭
@@ -344,9 +347,11 @@ class DQNAgent:
         # 모델과 타깃 모델 생성
         self.model = DQN(action_size, state_size)
         self.target_model = DQN(action_size, state_size)
-        self.optimizer = Adam(self.learning_rate, clipnorm=10.)
+        # self.optimizer = Adam(self.learning_rate, clipnorm=10.)
 
         # self.optimizer = RMSprop(self.learning_rate, clipnorm=10.1)
+
+        self.optimizer = RMSprop(lr=0.00025, epsilon=0.01)
 
         # 타깃 모델 초기화
         self.update_target_model()
@@ -410,13 +415,13 @@ class DQNAgent:
             # 현재 상태에 대한 모델의 큐함수
             predicts = self.model.call(np.float32(history))
             one_hot_action = tf.one_hot(actions, self.action_size)
-            predicts = tf.reduce_sum(one_hot_action * predicts, axis=-1)
+            predicts = tf.reduce_sum(one_hot_action * predicts, axis=1)
 
             # 다음 상태에 대한 타깃 모델의 큐함수
             target_predicts = self.target_model.call(np.float32(next_history))
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
-            max_q = np.amax(target_predicts, axis=-1)
+            max_q = np.amax(target_predicts, axis=1)
             targets = rewards + np.transpose(1 - dones) * self.discount_factor * max_q
 
             # 1) 벨만 최적 방정식을 이용한 업데이트 타깃
@@ -486,10 +491,19 @@ def proceed():
 
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
         state = np.float32(mazeMap)
+
         # state = np.float32(mazeMap) / 10.
         # state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
-        history = np.stack((state, state, state, state), axis=0)
-        history = np.reshape(history, (4, rsize * 2 + 1, csize * 2 + 1, 1))
+
+        # 1) (4, x, x, 1)
+        # history = np.stack((state, state, state, state), axis=0)
+        # history = np.reshape(history, (4, rsize * 2 + 1, csize * 2 + 1, 1))
+
+        # 2) (1, x, x, 4)
+        history = np.stack((state, state, state, state), axis=2)
+        history = np.reshape([history], (1, rsize * 2 + 1, csize * 2 + 1, 4))
+
+        # pprint.pprint(state)
         # pprint.pprint(np.shape(history))
         # pprint.pprint(history)
         # exit()
@@ -573,14 +587,24 @@ def proceed():
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32(mazeMap)
+
             # next_state = np.float32(mazeMap) / 10.
             # next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+
+            # 1) (4, x, x, 1)
+            # next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+            # next_history = np.append(next_state, history[:3, :, :, :], axis=0)
+
+            # 2) (1, x, x, 4)
             next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
-            next_history = np.append(next_state, history[:3, :, :, :], axis=0)
-            # next_history = np.reshape(next_history, (4, rsize * 2 + 1, csize * 2 + 1, 1))
+            next_history = np.append(next_state, history[:, :, :, :3], axis=3)
+
+            # print(np.shape(next_history))
+            # pprint.pprint(next_history)
+            # exit()
 
             # 가장 큰 Q값 가산
-            agent.avg_q_max += np.amax(agent.model.call(np.float32(history)))
+            agent.avg_q_max += np.amax(agent.model.call(np.float32(history))[0])
 
             score += reward
             reward = np.clip(reward, -1., 1.)
