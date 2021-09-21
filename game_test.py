@@ -21,6 +21,16 @@ ROTATE_DELAY = 0.0 / GAME_SPEED
 MOVE_DELAY = 0.0 / GAME_SPEED
 USE_MAX_STEP = False
 
+# 미로 크기 설정(홀수)
+rsize = 7
+csize = 7
+
+rsize = int(rsize/2)
+csize = int(csize/2)
+
+# action_size = 4
+state_size = (None, rsize*2+1, csize*2+1, 1)
+
 
 # 0: 방문하지 않은 블럭, 1: 벽, 2: 도착지, 3: 피스, 4: 방문했던 블럭
 class Room:
@@ -304,7 +314,7 @@ class DQN(tf.keras.Model):
 
 
 class DQNAgent:
-    def __init__(self, action_size=3, state_size=(None, 2 * 2 + 1, 2 * 2 + 1, 4)):
+    def __init__(self, action_size=3, state_size=state_size):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -322,9 +332,9 @@ class DQNAgent:
         self.epsilon_decay_step = 0.99
         self.max_step = 200
         self.batch_size = 32
-        self.train_start = 10000
+        self.train_start = 5000
         self.train_freq = 1
-        self.update_target_rate = 500
+        self.update_target_rate = 50
 
         # 리플레이 메모리, 최대 크기 100000
         self.memory = deque(maxlen=100000)
@@ -334,7 +344,7 @@ class DQNAgent:
         # 모델과 타깃 모델 생성
         self.model = DQN(action_size, state_size)
         self.target_model = DQN(action_size, state_size)
-        self.optimizer = Adam(self.learning_rate, clipnorm=1.0)
+        self.optimizer = Adam(self.learning_rate, clipnorm=10.)
 
         # self.optimizer = RMSprop(self.learning_rate, clipnorm=10.1)
 
@@ -357,7 +367,7 @@ class DQNAgent:
             return random.randint(0, self.action_size - 1)
         else:
             q_value = self.model.call(history)
-            return np.argmax(q_value)
+            return np.argmax(q_value[0])
 
     # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장
     def append_sample(self, history, action, reward, next_history, done):
@@ -382,28 +392,28 @@ class DQNAgent:
         # 메모리에서 배치 크기만큼 무작위로 샘플 추출
         batch = random.sample(self.memory, self.batch_size)
 
-        # history = np.array([sample[0][0] for sample in batch],
-        #                    dtype=np.float32)
-        state = np.array([sample[0][0] for sample in batch],
-                         dtype=np.float32)
+        history = np.array([sample[0][0] for sample in batch],
+                           dtype=np.float32)
+        # state = np.array([sample[0][0] for sample in batch],
+        #                  dtype=np.float32)
         actions = np.array([sample[1] for sample in batch])
         rewards = np.array([sample[2] for sample in batch])
         next_history = np.array([sample[3][0] for sample in batch],
                                 dtype=np.float32)
-        next_state = np.array([sample[3] for sample in batch],
-                              dtype=np.float32)
-        dones = np.array([[sample[4]] for sample in batch])
+        # next_state = np.array([sample[3] for sample in batch],
+        #                       dtype=np.float32)
+        dones = np.array([sample[4] for sample in batch])
 
         # 학습 파라미터
         model_params = self.model.trainable_variables
         with tf.GradientTape() as tape:
             # 현재 상태에 대한 모델의 큐함수
-            predicts = self.model.call(np.float32(state))
+            predicts = self.model.call(np.float32(history))
             one_hot_action = tf.one_hot(actions, self.action_size)
             predicts = tf.reduce_sum(one_hot_action * predicts, axis=-1)
 
             # 다음 상태에 대한 타깃 모델의 큐함수
-            target_predicts = self.target_model.call(np.float32(next_state))
+            target_predicts = self.target_model.call(np.float32(next_history))
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
             max_q = np.amax(target_predicts, axis=-1)
@@ -437,10 +447,10 @@ def proceed():
 
     time.sleep(1)
 
-    agent = DQNAgent(action_size=3, state_size=(None, rsize * 2 + 1, csize * 2 + 1, 4))
+    agent = DQNAgent(action_size=3, state_size=state_size)
 
-    agent.model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 4))
-    agent.target_model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 4))
+    agent.model.build(input_shape=state_size)
+    agent.target_model.build(input_shape=state_size)
 
     agent.model.summary()
     agent.target_model.summary()
@@ -478,25 +488,26 @@ def proceed():
         state = np.float32(mazeMap)
         # state = np.float32(mazeMap) / 10.
         # state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
-        history = np.stack((state, state, state, state), axis=1)
+        history = np.stack((state, state, state, state), axis=0)
         history = np.reshape(history, (4, rsize * 2 + 1, csize * 2 + 1, 1))
-        pprint.pprint(np.shape(history))
-        pprint.pprint(history)
-        exit()
+        # pprint.pprint(np.shape(history))
+        # pprint.pprint(history)
+        # exit()
 
         while not done:
             # time.sleep(1)
 
             # 바로 전 state를 입력으로 받아 행동을 선택
             # 0: 0도, 1: 90도, 2: -90도
-            action = agent.get_action(np.float32(state))
+            # action = agent.get_action(np.float32(state))
+            action = agent.get_action(np.float32(history))
 
             global_step += 1
             step += 1
 
             # 현재 각도 기준으로 회전
             degree = rotate[action]
-            print(degree)
+            # print(degree)
 
             # 회전 각도 누적 (그래픽 출력용)
             acc_deg += degree
@@ -520,13 +531,13 @@ def proceed():
                 # mazeMap[posY][posX] = 2
 
                 done = True
-                reward = 1
+                reward = 0.5
 
             if not done:
                 # 1) 이전에 방문했던 블럭 재방문 시
-                if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
-                    # 중간보상 방식
-                    reward = -0.01
+                # if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
+                #     # 중간보상 방식
+                #     reward = -0.01
                 #
                 #     # 에피소드 종료 방식
                 #     # reward = -1
@@ -541,7 +552,7 @@ def proceed():
 
                 g_move_ball(acc_deg)
 
-                time.sleep(2)
+                # time.sleep(2)
 
             # pprint.pprint(mazeMap)
 
@@ -569,12 +580,13 @@ def proceed():
             # next_history = np.reshape(next_history, (4, rsize * 2 + 1, csize * 2 + 1, 1))
 
             # 가장 큰 Q값 가산
-            agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
+            agent.avg_q_max += np.amax(agent.model.call(np.float32(history)))
 
             score += reward
             reward = np.clip(reward, -1., 1.)
             # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장 후 학습
-            agent.append_sample(state, action, reward, next_state, done)
+            # agent.append_sample(state, action, reward, next_state, done)
+            agent.append_sample(history, action, reward, next_history, done)
 
             history = next_history
 
@@ -663,12 +675,7 @@ def generate():
     tk.mainloop()
 
 
-# 미로 크기 설정(홀수)
-rsize = 7
-csize = 7
 
-rsize = int(rsize/2)
-csize = int(csize/2)
 
 maze = []
 mazeMap = []
@@ -684,9 +691,6 @@ canvas = ''
 
 ball = ''
 dest = ''
-
-# action_size = 4
-# state_size = (1, rsize*2+1, csize*2+1, 1)
 
 done = False
 
