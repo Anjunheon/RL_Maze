@@ -112,15 +112,36 @@ def reset_maze(acc_deg):
 
     mazeMap[destY][destX] = 2
 
-    rotate_maze(acc_deg)
-    move_ball(acc_deg)
+    g_rotate_maze(acc_deg)
+    g_move_ball(acc_deg)
 
     done = False
 
     tk.update()
 
 
-def rotate_maze(acc_deg):
+# 미로 회전
+def rotate_maze(degree):
+    global ROTATION_MODE, ROTATE_DELAY
+    global tk, canvas
+    global posX, posY
+    global maze, mazeMap
+    global ball, dest
+
+    if degree == 0:
+        mazeMap = np.array(mazeMap)
+    elif degree == 90:
+        mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+    elif degree == -90:
+        mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
+
+    # 플레이어 y 좌표
+    posY = np.where(mazeMap == 3)[0][0]
+    # 플레이어 x 좌표
+    posX = np.where(mazeMap == 3)[1][0]
+
+
+def g_rotate_maze(acc_deg):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global posX, posY
@@ -187,7 +208,20 @@ def rotate_maze(acc_deg):
     time.sleep(ROTATE_DELAY)
 
 
-def move_ball(acc_deg):
+def move_ball():
+    global mazeMap
+    global posX, posY
+    global rsize
+
+    if mazeMap[posY][posX] != 4:
+        mazeMap[posY][posX] = 4
+
+    if posY + 1 < rsize * 2 + 1:
+        if mazeMap[posY + 1][posX] != 1:
+            posY += 1
+
+
+def g_move_ball(acc_deg):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global mazeMap
@@ -270,7 +304,7 @@ class DQN(tf.keras.Model):
 
 
 class DQNAgent:
-    def __init__(self, action_size=3, state_size=(None, 2 * 2 + 1, 2 * 2 + 1, 1)):
+    def __init__(self, action_size=3, state_size=(None, 2 * 2 + 1, 2 * 2 + 1, 4)):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -403,10 +437,10 @@ def proceed():
 
     time.sleep(1)
 
-    agent = DQNAgent(action_size=3, state_size=(None, rsize * 2 + 1, csize * 2 + 1, 1))
+    agent = DQNAgent(action_size=3, state_size=(None, rsize * 2 + 1, csize * 2 + 1, 4))
 
-    agent.model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 1))
-    agent.target_model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 1))
+    agent.model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 4))
+    agent.target_model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 4))
 
     agent.model.summary()
     agent.target_model.summary()
@@ -443,70 +477,46 @@ def proceed():
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
         state = np.float32(mazeMap)
         # state = np.float32(mazeMap) / 10.
-        state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+        # state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+        history = np.stack((state, state, state, state), axis=1)
+        history = np.reshape(history, (4, rsize * 2 + 1, csize * 2 + 1, 1))
+        pprint.pprint(np.shape(history))
+        pprint.pprint(history)
+        exit()
 
         while not done:
             # time.sleep(1)
 
             # 바로 전 state를 입력으로 받아 행동을 선택
             # 0: 0도, 1: 90도, 2: -90도
-            if act_et - act_st >= act_t:
-                action = agent.get_action(np.float32(state))
-                act_st = time.time()
-                act_et = time.time()
-                # act_t = 0.1 / GAME_SPEED
-                act = True
+            action = agent.get_action(np.float32(state))
 
-                global_step += 1
-                step += 1
-            else:
-                action = 0
+            global_step += 1
+            step += 1
 
             # 현재 각도 기준으로 회전
             degree = rotate[action]
+            print(degree)
 
             # 회전 각도 누적 (그래픽 출력용)
             acc_deg += degree
             acc_deg %= 360
 
             # 미로 회전
-            if degree == 0:
-                mazeMap = np.array(mazeMap)
-            elif degree == 90:
-                mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
-            elif degree == -90:
-                mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
-
-            # 플레이어 y 좌표
-            posY = np.where(mazeMap == 3)[0][0]
-            # 플레이어 x 좌표
-            posX = np.where(mazeMap == 3)[1][0]
+            rotate_maze(degree)
 
             # 회전 후 미로 그래픽 출력
-            rotate_maze(acc_deg)
+            g_rotate_maze(acc_deg)
 
-            if mazeMap[posY][posX] != 4:
-                mazeMap[posY][posX] = 4
+            # 공의 하단에 길이 있을 시 공의 좌표 값 변경
+            move_ball()
 
-            # 공 이동
-            # if ball_et - ball_st >= ball_move or act:
-            if ball_et - ball_st >= ball_move:
-                if posY + 1 < rsize * 2 + 1:
-                    if mazeMap[posY + 1][posX] != 1:
-                        posY += 1
-
-                ball_st = time.time()
-                ball_et = time.time()
-
-            # 도착지점 도착 시
+            # 도착 지점 도착 시
             if mazeMap[posY][posX] == 2:
-                # 도착지점을 피스 정보로 표시
+                # 도착 지점을 공의 정보로 표시
                 mazeMap[posY][posX] = 3
 
-                # 도착지점을 다른 정보로 표시(플레이어 움직일 때 오류 발생)
-                # mazeMap[posY][posX] = 5
-
-                move_ball(acc_deg)
+                g_move_ball(acc_deg)
                 # mazeMap[posY][posX] = 2
 
                 done = True
@@ -529,7 +539,9 @@ def proceed():
 
                 mazeMap[posY][posX] = 3
 
-                move_ball(acc_deg)
+                g_move_ball(acc_deg)
+
+                time.sleep(2)
 
             # pprint.pprint(mazeMap)
 
@@ -548,29 +560,31 @@ def proceed():
                 # reward = -((np.abs(destX-posX) + np.abs(destY-posY))) / 10
             # print(reward)
 
-            if act:
-                # 각 타임스텝마다 상태 전처리
-                next_state = np.float32(mazeMap)
-                # next_state = np.float32(mazeMap) / 10.
-                next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+            # 각 타임스텝마다 상태 전처리
+            next_state = np.float32(mazeMap)
+            # next_state = np.float32(mazeMap) / 10.
+            # next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+            next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+            next_history = np.append(next_state, history[:3, :, :, :], axis=0)
+            # next_history = np.reshape(next_history, (4, rsize * 2 + 1, csize * 2 + 1, 1))
 
-                # 가장 큰 Q값 가산
-                agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
+            # 가장 큰 Q값 가산
+            agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
 
-                score += reward
-                reward = np.clip(reward, -1., 1.)
-                # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장 후 학습
-                agent.append_sample(state, action, reward, next_state, done)
+            score += reward
+            reward = np.clip(reward, -1., 1.)
+            # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장 후 학습
+            agent.append_sample(state, action, reward, next_state, done)
 
-                # 리플레이 메모리 크기가 정해놓은 수치에 도달한 시점부터 모델 학습 시작
-                if len(agent.memory) >= agent.train_start:
-                    if step % agent.train_freq == 0:
-                        agent.train_model()
-                        # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
-                        if global_step % agent.update_target_rate == 0:
-                            agent.update_target_model()
+            history = next_history
 
-                act = False
+            # 리플레이 메모리 크기가 정해놓은 수치에 도달한 시점부터 모델 학습 시작
+            if len(agent.memory) >= agent.train_start:
+                if step % agent.train_freq == 0:
+                    agent.train_model()
+                    # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
+                    if global_step % agent.update_target_rate == 0:
+                        agent.update_target_model()
 
             if done:
                 # 각 에피소드마다 타깃 모델을 모델의 가중치로 업데이트
@@ -596,9 +610,6 @@ def proceed():
                 print(log)
 
                 agent.avg_q_max, agent.avg_loss = 0, 0
-
-            ball_et = time.time()
-            act_et = time.time()
 
         # 100 에피소드마다 모델 저장
         if e % 100 == 0:
