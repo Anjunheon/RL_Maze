@@ -425,13 +425,13 @@ class DQNAgent:
             targets = rewards + np.transpose(1 - dones) * self.discount_factor * max_q
 
             # 1) 벨만 최적 방정식을 이용한 업데이트 타깃
-            loss = tf.reduce_mean(tf.square(targets[0] - predicts))
+            # loss = tf.reduce_mean(tf.square(targets[0] - predicts))
 
             # 2) 후버로스 계산
-            # error = tf.abs(targets[0] - predicts)
-            # quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
-            # linear_part = error - quadratic_part
-            # loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
+            error = tf.abs(targets[0] - predicts)
+            quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
+            linear_part = error - quadratic_part
+            loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
 
             self.avg_loss += loss.numpy()
 
@@ -697,8 +697,6 @@ def generate():
 
     tk.focus_force()
     tk.mainloop()
-
-
 
 
 maze = []
