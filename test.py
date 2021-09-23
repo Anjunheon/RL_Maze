@@ -19,9 +19,9 @@ start_time = str(tm.tm_year) + str(tm.tm_mon) + str(tm.tm_mday) + str(tm.tm_hour
 
 PLAY_MODE = 0
 GAME_SPEED = 1  # 1~10
-ROTATION_MODE = False  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.0 / GAME_SPEED
-MOVE_DELAY = 0.0 / GAME_SPEED
+ROTATION_MODE = True  # 미로 회전 그래픽 출력
+ROTATE_DELAY = 0.2 / GAME_SPEED
+MOVE_DELAY = 0.2 / GAME_SPEED
 USE_MAX_STEP = False
 
 # 미로 크기 설정(홀수)
@@ -78,7 +78,7 @@ def make_maze():
     global maze, mazeMap
     global rsize, csize
     global destY, destX
-
+    """
     maze = [[Room(r, c) for c in range(csize)] for r in range(rsize)]
     mazeMap = [[1 for c in range(csize * 2 + 1)] for r in range(rsize * 2 + 1)]
 
@@ -93,6 +93,14 @@ def make_maze():
         destX = np.shape(mazeMap)[1] - 1
         # print(destX, destY)
         break
+    """
+    mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                        [1, 0, 0, 0, 0, 0, 2],
+                        [1, 1, 1, 1, 1, 0, 1],
+                        [1, 0, 0, 0, 1, 0, 1],
+                        [1, 0, 1, 1, 1, 0, 1],
+                        [1, 0, 0, 0, 0, 0, 1],
+                        [1, 1, 1, 1, 1, 1, 1]])
 
 
 def reset_maze(acc_deg):
@@ -321,7 +329,7 @@ class DQNAgent:
         self.epsilon_decay_step = 0.99
         self.max_step = 500
         self.batch_size = 32
-        self.train_start = 10000
+        self.train_start = 0
         self.train_freq = 5
         self.update_target_rate = 500
 
@@ -348,14 +356,10 @@ class DQNAgent:
         self.target_model.set_weights(self.model.get_weights())
 
     # 입실론 탐욕 정책으로 행동 선택
-    def get_action(self, history):
-        history = np.float32(history)
-        q_value = self.model.call(history)
-        if np.random.rand() <= self.epsilon:
-            return random.randint(0, self.action_size - 1)
-        else:
-            q_value = self.model.call(history)
-            return np.argmax(q_value[0])
+    def get_action(self, state):
+        state = np.float32(state)
+        q_value = self.model.call(state)
+        return np.argmax(q_value[0])
 
     # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장
     def append_sample(self, state, action, reward, next_state, done):
@@ -432,6 +436,8 @@ def proceed():
 
     agent.model.build(input_shape=state_size)
     agent.target_model.build(input_shape=state_size)
+
+    agent.model.load_weights("save_model/20219232314/model900")
 
     agent.model.summary()
     agent.target_model.summary()
@@ -549,14 +555,6 @@ def proceed():
 
             state = next_state
 
-            # 리플레이 메모리 크기가 정해놓은 수치에 도달한 시점부터 모델 학습 시작
-            if len(agent.memory) >= agent.train_start:
-                if step % agent.train_freq == 0:
-                    agent.train_model()
-                    # 일정 시간마다 타겟모델을 모델의 가중치로 업데이트
-                    if global_step % agent.update_target_rate == 0:
-                        agent.update_target_model()
-
             if done:
                 # 각 에피소드 당 학습 정보를 기록
                 if global_step > agent.train_start:
@@ -578,10 +576,6 @@ def proceed():
                 print(log)
 
                 agent.avg_q_max, agent.avg_loss = 0, 0
-
-        # 100 에피소드마다 모델 저장
-        if e % 100 == 0:
-            agent.model.save_weights("./save_model/" + start_time + "/model" + str(e), save_format="h5")
 
         degree = 0
         reset_maze(acc_deg)
@@ -637,8 +631,8 @@ mazeMap = []
 posX = 1
 posY = 0
 
-destX = 0
-destY = 0
+destX = 6
+destY = 1
 
 tk = ''
 canvas = ''
