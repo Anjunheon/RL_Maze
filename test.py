@@ -8,17 +8,30 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import tensorflow as tf
 from collections import deque
-from tensorflow.keras.optimizers import Adam, RMSprop
-from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Dense, Flatten, Dropout
 from tensorflow.keras.initializers import RandomUniform
 
 import pprint
 
+tm = time.localtime()
+start_time = str(tm.tm_year) + str(tm.tm_mon) + str(tm.tm_mday) + str(tm.tm_hour) + str(tm.tm_min)
+
 PLAY_MODE = 0
+GAME_SPEED = 1  # 1~10
 ROTATION_MODE = False  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.0
-MOVE_DELAY = 0.0
+ROTATE_DELAY = 0.0 / GAME_SPEED
+MOVE_DELAY = 0.0 / GAME_SPEED
 USE_MAX_STEP = False
+
+# 미로 크기 설정(홀수)
+rsize = 7
+csize = 7
+
+rsize = int(rsize/2)
+csize = int(csize/2)
+
+state_size = (None, rsize*2+1, csize*2+1)
 
 
 # 0: 방문하지 않은 블럭, 1: 벽, 2: 도착지, 3: 피스, 4: 방문했던 블럭
@@ -111,23 +124,41 @@ def reset_maze(acc_deg):
 
     mazeMap[destY][destX] = 2
 
-    rotate_maze(acc_deg)
-    move_ball(acc_deg)
+    g_rotate_maze(acc_deg)
+    g_move_ball(acc_deg)
 
     done = False
 
     tk.update()
 
 
-def rotate_maze(acc_deg):
+# 미로 회전
+def rotate_maze(degree):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global posX, posY
     global maze, mazeMap
     global ball, dest
 
-    # print('rotate maze')
-    # pprint.pprint(mazeMap)
+    if degree == 0:
+        mazeMap = np.array(mazeMap)
+    elif degree == 90:
+        mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+    elif degree == -90:
+        mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
+
+    # 플레이어 y 좌표
+    posY = np.where(mazeMap == 3)[0][0]
+    # 플레이어 x 좌표
+    posX = np.where(mazeMap == 3)[1][0]
+
+
+def g_rotate_maze(acc_deg):
+    global ROTATION_MODE, ROTATE_DELAY
+    global tk, canvas
+    global posX, posY
+    global maze, mazeMap
+    global ball, dest
 
     canvas.delete('all')
 
@@ -145,7 +176,7 @@ def rotate_maze(acc_deg):
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
             canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#242C2E', outline='#242C2E',
-                                    width='3')
+                                    width='0')
 
     for i, r in enumerate(mazeMap):
         for j, c in enumerate(r):
@@ -186,15 +217,30 @@ def rotate_maze(acc_deg):
     time.sleep(ROTATE_DELAY)
 
 
-def move_ball(acc_deg):
+def move_ball():
+    global mazeMap
+    global posX, posY
+    global rsize
+
+    # 플레이어 y 좌표
+    posY = np.where(mazeMap == 3)[0][0]
+    # 플레이어 x 좌표
+    posX = np.where(mazeMap == 3)[1][0]
+
+    if mazeMap[posY][posX] != 4:
+        mazeMap[posY][posX] = 4
+
+    if posY + 1 < rsize * 2 + 1:
+        if mazeMap[posY + 1][posX] != 1:
+            posY += 1
+
+
+def g_move_ball(acc_deg):
     global ROTATION_MODE, ROTATE_DELAY
     global tk, canvas
     global mazeMap
     global ball, dest
     global posX, posY
-
-    # print('move player')
-    # pprint.pprint(mazeMap)
 
     if not ROTATION_MODE:
         if acc_deg == 0:
@@ -207,9 +253,9 @@ def move_ball(acc_deg):
         elif 360-acc_deg == 270:
             mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
 
-    # 플레이어 y 좌표
+    # 공의 y 좌표
     posY = np.where(mazeMap == 3)[0][0]
-    # 플레이어 x 좌표
+    # 공의 x 좌표
     posX = np.where(mazeMap == 3)[1][0]
 
     ball.place(x=posX * 50 + 5, y=posY * 50 + 3)
@@ -240,36 +286,24 @@ def move_ball(acc_deg):
 class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
-        # self.conv = Conv2D(32, (1, 1), strides=(1, 1), activation='relu', input_shape=state_size)
-        # self.flatten = Flatten()
-        # self.fc = Dense(64, activation='relu')
-        # self.dropout = Dropout(0.5)
-        # self.fc_out = Dense(action_size)
 
-        self.fc1 = Dense(32, activation='tanh', input_shape=state_size)
-        self.flatten = Flatten()
-        self.fc2 = Dense(32, activation='tanh')
-        self.fc3 = Dense(64, activation='tanh')
+        self.fc1 = Dense(16, activation='relu')
+        self.fc2 = Dense(32, activation='relu')
+        self.dropout = Dropout(0.5)
+        self.flatten = Flatten(input_shape=state_size)
         self.fc_out = Dense(action_size, activation='linear')
 
-
     def call(self, x):
-        # x = self.conv(x)
-        # x = self.flatten(x)
-        # x = self.dropout(x)
-        # x = self.fc(x)
-        # q = self.fc_out(x)
-
         x = self.fc1(x)
-        x = self.flatten(x)
         x = self.fc2(x)
-        x = self.fc3(x)
+        x = self.dropout(x)
+        x = self.flatten(x)
         q = self.fc_out(x)
         return q
 
 
 class DQNAgent:
-    def __init__(self, action_size=3, state_size=(None, 2 * 2 + 1, 2 * 2 + 1, 1)):
+    def __init__(self, action_size=3, state_size=state_size):
         self.render = False
 
         # 상태와 행동의 크기 정의
@@ -280,28 +314,26 @@ class DQNAgent:
         self.discount_factor = 0.99
         self.learning_rate = 1e-4
         self.epsilon = 1.
-        self.epsilon_start, self.epsilon_end = 1.0, 0.02
+        self.epsilon_start, self.epsilon_end = 1.0, 0.1
         # self.exploration_steps = 1000000.
         # self.epsilon_decay_step = self.epsilon_start - self.epsilon_end
         # self.epsilon_decay_step /= self.exploration_steps
         self.epsilon_decay_step = 0.99
-        self.max_step = 200
+        self.max_step = 500
         self.batch_size = 32
-        self.train_start = 5000
+        self.train_start = 10000
         self.train_freq = 5
-        self.update_target_rate = 20
+        self.update_target_rate = 500
 
-        # 리플레이 메모리, 최대 크기 2000
-        self.memory = deque(maxlen=20000)
+        # 리플레이 메모리, 최대 크기 100000
+        self.memory = deque(maxlen=100000)
         # 게임 시작 후 랜덤하게 움직이지 않는 것에 대한 옵션
         self.no_op_steps = 50
 
         # 모델과 타깃 모델 생성
         self.model = DQN(action_size, state_size)
         self.target_model = DQN(action_size, state_size)
-        self.optimizer = Adam(self.learning_rate, clipnorm=5.)
-
-        # self.optimizer = RMSprop(self.learning_rate, clipnorm=10.1)
+        self.optimizer = Adam(learning_rate=0.00025, clipnorm=1.0)
 
         # 타깃 모델 초기화
         self.update_target_model()
@@ -318,15 +350,16 @@ class DQNAgent:
     # 입실론 탐욕 정책으로 행동 선택
     def get_action(self, history):
         history = np.float32(history)
+        q_value = self.model.call(history)
         if np.random.rand() <= self.epsilon:
             return random.randint(0, self.action_size - 1)
         else:
             q_value = self.model.call(history)
-            return np.argmax(q_value)
+            return np.argmax(q_value[0])
 
     # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장
-    def append_sample(self, history, action, reward, next_history, done):
-        self.memory.append((history, action, reward, next_history, done))
+    def append_sample(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
 
     # 텐서보드에 학습 정보를 기록
     def draw_tensorboard(self, score, step, episode):
@@ -334,7 +367,7 @@ class DQNAgent:
             tf.summary.scalar('Total Reward/Episode', score, step=episode)
             tf.summary.scalar('Average Max Q/Episode',
                               self.avg_q_max / float(step), step=episode)
-            tf.summary.scalar('Duration/Episode', step, step=episode)
+            tf.summary.scalar('Steps/Episode', step, step=episode)
             tf.summary.scalar('Average Loss/Episode',
                               self.avg_loss / float(step), step=episode)
 
@@ -347,14 +380,11 @@ class DQNAgent:
         # 메모리에서 배치 크기만큼 무작위로 샘플 추출
         batch = random.sample(self.memory, self.batch_size)
 
-        # history = np.array([sample[0][0] for sample in batch],
-        #                    dtype=np.float32)
+        # 1) simple state
         state = np.array([sample[0][0] for sample in batch],
                          dtype=np.float32)
         actions = np.array([sample[1] for sample in batch])
         rewards = np.array([sample[2] for sample in batch])
-        next_history = np.array([sample[3][0] for sample in batch],
-                                dtype=np.float32)
         next_state = np.array([sample[3] for sample in batch],
                               dtype=np.float32)
         dones = np.array([[sample[4]] for sample in batch])
@@ -372,16 +402,11 @@ class DQNAgent:
 
             # 벨만 최적 방정식을 구성하기 위한 타깃과 큐함수의 최대 값 계산
             max_q = np.amax(target_predicts, axis=-1)
+
             targets = rewards + np.transpose(1 - dones) * self.discount_factor * max_q
 
             # 1) 벨만 최적 방정식을 이용한 업데이트 타깃
             loss = tf.reduce_mean(tf.square(targets[0] - predicts))
-
-            # 2) 후버로스 계산
-            # error = tf.abs(targets[0] - predicts)
-            # quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
-            # linear_part = error - quadratic_part
-            # loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
 
             self.avg_loss += loss.numpy()
 
@@ -399,13 +424,14 @@ def proceed():
     global mazeMap
     global done
     global ball
+    global start_time
 
     time.sleep(1)
 
-    agent = DQNAgent(action_size=3, state_size=(None, rsize * 2 + 1, csize * 2 + 1, 1))
+    agent = DQNAgent(action_size=3, state_size=state_size)
 
-    agent.model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 1))
-    agent.target_model.build(input_shape=(None, rsize * 2 + 1, csize * 2 + 1, 1))
+    agent.model.build(input_shape=state_size)
+    agent.target_model.build(input_shape=state_size)
 
     agent.model.summary()
     agent.target_model.summary()
@@ -428,23 +454,22 @@ def proceed():
 
         step, score = 0, 0
 
-        ball_st = time.time()
-        ball_et = time.time()
-        ball_move = 0.3  # 공 이동 시간 간격
-
         # 프레임을 전처리 한 후 4개의 상태를 쌓아서 입력값으로 사용.
         state = np.float32(mazeMap)
-        # state = np.float32(mazeMap) / 10.
-        state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+
+        state = state / 10.
+        state = np.reshape([state], (1, rsize * 2 + 1, csize * 2 + 1))
 
         while not done:
             # time.sleep(1)
-            global_step += 1
-            step += 1
+            # print(posX, posY)
 
             # 바로 전 state를 입력으로 받아 행동을 선택
             # 0: 0도, 1: 90도, 2: -90도
             action = agent.get_action(np.float32(state))
+
+            global_step += 1
+            step += 1
 
             # 현재 각도 기준으로 회전
             degree = rotate[action]
@@ -454,62 +479,42 @@ def proceed():
             acc_deg %= 360
 
             # 미로 회전
-            if degree == 0:
-                mazeMap = np.array(mazeMap)
-            elif degree == 90:
-                mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
-            elif degree == -90:
-                mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
-
-            # 플레이어 y 좌표
-            posY = np.where(mazeMap == 3)[0][0]
-            # 플레이어 x 좌표
-            posX = np.where(mazeMap == 3)[1][0]
+            rotate_maze(degree)
 
             # 회전 후 미로 그래픽 출력
-            rotate_maze(acc_deg)
+            g_rotate_maze(acc_deg)
 
-            if mazeMap[posY][posX] != 4:
-                mazeMap[posY][posX] = 4
+            # 공의 하단에 길이 있을 시 공의 좌표 값 변경
+            move_ball()
 
-            if posY + 1 < rsize * 2 + 1:
-                if mazeMap[posY + 1][posX] != 1:
-                    posY += 1
-
-            # 도착지점 도착 시
+            # 도착 지점 도착 시
             if mazeMap[posY][posX] == 2:
-                # 도착지점을 피스 정보로 표시
+                # 도착 지점을 공의 정보로 표시
                 mazeMap[posY][posX] = 3
 
-                # 도착지점을 다른 정보로 표시(플레이어 움직일 때 오류 발생)
-                # mazeMap[posY][posX] = 5
-
-                move_ball(acc_deg)
-                # mazeMap[posY][posX] = 2
+                g_move_ball(acc_deg)
 
                 done = True
                 reward = 1
 
             if not done:
-                # 이전에 방문했던 블럭 재방문 시
-                # if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
-                #     # 중간보상 방식
-                #     reward = -1
+                # 1) 이전에 방문했던 블럭 재방문 시
+                if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
+                    # 중간보상 방식
+                    reward = -0.015
                 #
                 #     # 에피소드 종료 방식
                 #     # reward = -1
                 #     # done = True
                 # else:
-                #     reward = 0
+                #     reward = 0.005
 
-                # 스텝마다 - 보상
-                reward = -0.01
+                # 2) 스텝마다 - 보상
+                # reward = -0.01
 
                 mazeMap[posY][posX] = 3
 
-                move_ball(acc_deg)
-
-            # pprint.pprint(mazeMap)
+                g_move_ball(acc_deg)
 
             # 중간 보상 : 맨해튼 거리
             if not done:
@@ -528,16 +533,21 @@ def proceed():
 
             # 각 타임스텝마다 상태 전처리
             next_state = np.float32(mazeMap)
-            # next_state = np.float32(mazeMap) / 10.
-            next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1, 1))
+
+            # 1) 2D Array
+            next_state = next_state / 10.
+            next_state = np.reshape([next_state], (1, rsize * 2 + 1, csize * 2 + 1))
 
             # 가장 큰 Q값 가산
             agent.avg_q_max += np.amax(agent.model.call(np.float32([state])))
 
             score += reward
             reward = np.clip(reward, -1., 1.)
+
             # 샘플 <s, a, r, s'>을 리플레이 메모리에 저장 후 학습
             agent.append_sample(state, action, reward, next_state, done)
+
+            state = next_state
 
             # 리플레이 메모리 크기가 정해놓은 수치에 도달한 시점부터 모델 학습 시작
             if len(agent.memory) >= agent.train_start:
@@ -548,9 +558,6 @@ def proceed():
                         agent.update_target_model()
 
             if done:
-                # 각 에피소드마다 타깃 모델을 모델의 가중치로 업데이트
-                # agent.update_target_model()
-
                 # 각 에피소드 당 학습 정보를 기록
                 if global_step > agent.train_start:
                     agent.draw_tensorboard(score, step, e)
@@ -574,7 +581,7 @@ def proceed():
 
         # 100 에피소드마다 모델 저장
         if e % 100 == 0:
-            agent.model.save_weights("./save_model/model", save_format="tf")
+            agent.model.save_weights("./save_model/" + start_time + "/model" + str(e), save_format="h5")
 
         degree = 0
         reset_maze(acc_deg)
@@ -624,13 +631,6 @@ def generate():
     tk.mainloop()
 
 
-# 미로 크기 설정(홀수)
-rsize = 7
-csize = 7
-
-rsize = int(rsize/2)
-csize = int(csize/2)
-
 maze = []
 mazeMap = []
 
@@ -645,9 +645,6 @@ canvas = ''
 
 ball = ''
 dest = ''
-
-# action_size = 4
-# state_size = (1, rsize*2+1, csize*2+1, 1)
 
 done = False
 
