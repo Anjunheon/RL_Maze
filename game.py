@@ -581,7 +581,7 @@ def proceed():
 
         # 100 에피소드마다 모델 저장
         if e % 100 == 0:
-            agent.model.save_weights("./save_model/" + start_time + "/model" + str(e), save_format="tf")
+            agent.model.save_weights("save_model/" + start_time + "/model" + str(e), save_format="tf")
 
         degree = 0
         reset_maze(acc_deg)
