@@ -20,9 +20,23 @@ start_time = str(tm.tm_year) + str(tm.tm_mon) + str(tm.tm_mday) + str(tm.tm_hour
 PLAY_MODE = 0
 GAME_SPEED = 1  # 1~10
 ROTATION_MODE = True  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.05 / GAME_SPEED
-MOVE_DELAY = 0.05 / GAME_SPEED
+ROTATE_DELAY = 0.0 / GAME_SPEED
+MOVE_DELAY = 0.0 / GAME_SPEED
 USE_MAX_STEP = False
+
+# (학습 시작 step / 타겟 네트워크 업데이트 step / 행동 네트워크 업데이트 step / 학습 시작 ep)
+# 1_1 (5000 / 500 / 5) : 900 / 1000 / 1200
+# 1_2 (5000 / 500 / 5) : 1(x) / 30(x) / 50(8) / 80(7)
+# 1_3 (5000 / 500 / 1) : 1(x) / 30(x) / 50(x) / 60(9) / 65(7) / 70(7)
+# 2_1 (5000 / 500 / 5) : 30(x) / 60(x) / 150(9) / 160(11)
+# 2_2 (5000 / 500 / 5) : 1(11) / 30(11) / 40(x) / 60(x) / 65(13) / 70(13)
+# 2_3 (5000 / 500 / 1 / 46) : 1(x) / 30(x) / 35(8) / 50(11) / 80(10) / 90(8) / 100(10) / 150(8)
+# 3_1 (5000 / 500 / 1 / 33) : 1(x) / 33(x) / 40(x) / 45(x)
+# 3_3 (10000 / 500 / 1 / 56) : 1(x) / 33(x) / 40(x) / 45(x)
+
+MAZE_NUM = 3  # 미로 종류
+SUB_NUM = 1  # 미로별 학습 폴더 번호
+EP_NUM = 40  # 불러올 모델의 학습 에피소드 번호
 
 # 미로 크기 설정(홀수)
 rsize = 7
@@ -78,6 +92,7 @@ def make_maze():
     global maze, mazeMap
     global rsize, csize
     global destY, destX
+    global MAZE_NUM
     """
     maze = [[Room(r, c) for c in range(csize)] for r in range(rsize)]
     mazeMap = [[1 for c in range(csize * 2 + 1)] for r in range(rsize * 2 + 1)]
@@ -94,13 +109,34 @@ def make_maze():
         # print(destX, destY)
         break
     """
-    mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
-                        [1, 0, 0, 0, 0, 0, 2],
-                        [1, 1, 1, 1, 1, 0, 1],
-                        [1, 0, 0, 0, 1, 0, 1],
-                        [1, 0, 1, 1, 1, 0, 1],
-                        [1, 0, 0, 0, 0, 0, 1],
-                        [1, 1, 1, 1, 1, 1, 1]])
+
+    if MAZE_NUM == 1:
+        # #1
+        mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                            [1, 0, 0, 0, 0, 0, 2],
+                            [1, 1, 1, 1, 1, 0, 1],
+                            [1, 0, 0, 0, 1, 0, 1],
+                            [1, 0, 1, 1, 1, 0, 1],
+                            [1, 0, 0, 0, 0, 0, 1],
+                            [1, 1, 1, 1, 1, 1, 1]])
+    elif MAZE_NUM == 2:
+        # #2
+        mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                            [1, 0, 0, 0, 0, 0, 1],
+                            [1, 1, 1, 1, 1, 0, 2],
+                            [1, 0, 0, 0, 1, 0, 1],
+                            [1, 0, 1, 1, 1, 0, 1],
+                            [1, 0, 0, 0, 0, 0, 1],
+                            [1, 1, 1, 1, 1, 1, 1]])
+    elif MAZE_NUM == 3:
+        # #3
+        mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                            [1, 0, 1, 0, 0, 0, 1],
+                            [1, 0, 0, 0, 1, 0, 2],
+                            [1, 1, 1, 1, 1, 0, 1],
+                            [1, 0, 1, 1, 1, 0, 1],
+                            [1, 0, 0, 0, 0, 0, 1],
+                            [1, 1, 1, 1, 1, 1, 1]])
 
 
 def reset_maze(acc_deg):
@@ -429,6 +465,7 @@ def proceed():
     global done
     global ball
     global start_time
+    global MAZE_NUM, SUB_NUM, EP_NUM
 
     time.sleep(1)
 
@@ -437,7 +474,7 @@ def proceed():
     agent.model.build(input_shape=state_size)
     agent.target_model.build(input_shape=state_size)
 
-    agent.model.load_weights("save_model/20219232314/model900")
+    agent.model.load_weights("save_model/" + str(MAZE_NUM) + "_" + str(SUB_NUM) + "/model" + str(EP_NUM))
 
     agent.model.summary()
     agent.target_model.summary()
@@ -631,8 +668,14 @@ mazeMap = []
 posX = 1
 posY = 0
 
-destX = 6
-destY = 1
+if MAZE_NUM == 1:
+    # 1
+    destX = 6
+    destY = 1
+elif MAZE_NUM == 2 or MAZE_NUM == 3:
+    # 2
+    destX = 6
+    destY = 2
 
 tk = ''
 canvas = ''
