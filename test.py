@@ -20,8 +20,8 @@ start_time = str(tm.tm_year) + str(tm.tm_mon) + str(tm.tm_mday) + str(tm.tm_hour
 PLAY_MODE = 0
 GAME_SPEED = 1  # 1~10
 ROTATION_MODE = True  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.2 / GAME_SPEED
-MOVE_DELAY = 0.2 / GAME_SPEED
+ROTATE_DELAY = 0.05 / GAME_SPEED
+MOVE_DELAY = 0.05 / GAME_SPEED
 USE_MAX_STEP = False
 
 # 미로 크기 설정(홀수)
