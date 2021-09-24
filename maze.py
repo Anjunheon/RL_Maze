@@ -84,15 +84,15 @@ def make_maze():
 
     make(None, maze[0][0], maze, rsize, csize)
 
-    # while True:
-    #     r = random.randint(1, rsize * 2)
-    #     if mazeMap[r][-2] == 1:
-    #         continue
-    #     mazeMap[r][-1] = 2
-    #     destY = r
-    #     destX = np.shape(mazeMap)[1] - 1
-    #     # print(destX, destY)
-    #     break
+    while True:
+        r = random.randint(1, rsize * 2)
+        if mazeMap[r][-2] == 1:
+            continue
+        mazeMap[r][-1] = 2
+        destY = r
+        destX = np.shape(mazeMap)[1] - 1
+        # print(destX, destY)
+        break
 
 
 def reset_maze(acc_deg):
