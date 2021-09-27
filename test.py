@@ -20,8 +20,8 @@ start_time = str(tm.tm_year) + str(tm.tm_mon) + str(tm.tm_mday) + str(tm.tm_hour
 PLAY_MODE = 0
 GAME_SPEED = 1  # 1~10
 ROTATION_MODE = True  # 미로 회전 그래픽 출력
-ROTATE_DELAY = 0.0 / GAME_SPEED
-MOVE_DELAY = 0.0 / GAME_SPEED
+ROTATE_DELAY = 0.2 / GAME_SPEED
+MOVE_DELAY = 0.2 / GAME_SPEED
 USE_MAX_STEP = False
 
 # (학습 시작 step / 타겟 네트워크 업데이트 step / 행동 네트워크 업데이트 step / 학습 시작 ep / 최적 step)
@@ -36,9 +36,14 @@ USE_MAX_STEP = False
 # 3_1 (5000 / 500 / 1 / 33 / 9) : 1(x) / 33(x) / 40(x) / 45(x)
 # 3_2 (10000 / 500 / 1 / 56 / 9) : 1(x) / 60(12) / 70(x) / 100(11) / 110(10) / 220(9)
 
-MAZE_NUM = 2  # 미로 종류
-SUB_NUM = 2  # 미로별 학습 폴더 번호
-EP_NUM = 1  # 불러올 모델의 학습 에피소드 번호
+# 4_1 (20000 / 500 / 1 / 128 / 17) : 196~
+
+# 5_1 (20000 / 500 / 1 / 12 / 38) : x
+# 5_2 (150000 / 500 / 1 / 110 / 38) :
+
+MAZE_NUM = 4  # 미로 종류
+SUB_NUM = 1  # 미로별 학습 폴더 번호
+EP_NUM = 700  # 불러올 모델의 학습 에피소드 번호
 
 # 미로 크기 설정(홀수)
 rsize = 7
@@ -139,6 +144,15 @@ def make_maze():
                             [1, 0, 1, 1, 1, 0, 1],
                             [1, 0, 0, 0, 0, 0, 1],
                             [1, 1, 1, 1, 1, 1, 1]])
+    elif MAZE_NUM == 4:
+        # #4
+        mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                            [1, 0, 1, 0, 0, 0, 1],
+                            [1, 0, 1, 0, 1, 0, 1],
+                            [1, 0, 0, 0, 1, 0, 1],
+                            [1, 1, 1, 1, 1, 0, 1],
+                            [1, 0, 0, 0, 0, 0, 1],
+                            [1, 1, 2, 1, 1, 1, 1]])
 
 
 def reset_maze(acc_deg):
@@ -469,7 +483,7 @@ def proceed():
     global start_time
     global MAZE_NUM, SUB_NUM, EP_NUM
 
-    time.sleep(1)
+    time.sleep(3)
 
     agent = DQNAgent(action_size=3, state_size=state_size)
 
@@ -678,6 +692,9 @@ elif MAZE_NUM == 2 or MAZE_NUM == 3:
     # 2
     destX = 6
     destY = 2
+elif MAZE_NUM == 4:
+    destX = 2
+    destY = 6
 
 tk = ''
 canvas = ''
