@@ -364,18 +364,18 @@ class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
 
-        self.fc1 = Dense(16, activation='relu')
-        self.fc2 = Dense(32, activation='relu')
+        self.fc1 = Dense(32, activation='relu')
+        # self.fc2 = Dense(32, activation='relu')
         # self.fc3 = Dense(32, activation='relu')
-        self.dropout = Dropout(0.5)
+        # self.dropout = Dropout(0.5)
         self.flatten = Flatten(input_shape=state_size)
         self.fc_out = Dense(action_size, activation='linear')
 
     def call(self, x):
         x = self.fc1(x)
-        x = self.fc2(x)
+        # x = self.fc2(x)
         # x = self.fc3(x)
-        x = self.dropout(x)
+        # x = self.dropout(x)
         x = self.flatten(x)
         q = self.fc_out(x)
         return q
@@ -400,7 +400,7 @@ class DQNAgent:
         self.epsilon_decay_step = 0.99
         self.max_step = 500
         self.batch_size = 32
-        self.train_start = 150000
+        self.train_start = 70000
         self.train_freq = 1
         self.update_target_rate = 500
 
@@ -581,7 +581,7 @@ def proceed():
                 if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
                     # 중간보상 방식
                     # reward = -0.015
-                    reward = 0.01
+                    reward = -0.01
                 #
                 #     # 에피소드 종료 방식
                 #     # reward = -1
