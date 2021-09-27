@@ -24,11 +24,23 @@ ROTATE_DELAY = 0.0 / GAME_SPEED
 MOVE_DELAY = 0.0 / GAME_SPEED
 USE_MAX_STEP = False
 
-MAZE_NUM = 3  # 미로 종류
+CUSTOM = True
+MAZE_NUM = 5  # 미로 종류
 
 # 미로 크기 설정(홀수)
-rsize = 7
-csize = 7
+if not CUSTOM:
+    rsize = 10
+    csize = 10
+else:
+    if MAZE_NUM <= 4:
+        rsize = 7
+        csize = 7
+    elif MAZE_NUM == 5:
+        rsize = 11
+        csize = 11
+    elif MAZE_NUM == 6:
+        rsize = 15
+        csize = 15
 
 rsize = int(rsize/2)
 csize = int(csize/2)
@@ -87,43 +99,77 @@ def make_maze():
 
     make(None, maze[0][0], maze, rsize, csize)
 
-    # while True:
-    #     r = random.randint(1, rsize * 2)
-    #     if mazeMap[r][-2] == 1:
-    #         continue
-    #     mazeMap[r][-1] = 2
-    #     destY = r
-    #     destX = np.shape(mazeMap)[1] - 1
-    #     # print(destX, destY)
-    #     break
-
-    if MAZE_NUM == 1:
-        # #1
-        mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
-                            [1, 0, 0, 0, 0, 0, 2],
-                            [1, 1, 1, 1, 1, 0, 1],
-                            [1, 0, 0, 0, 1, 0, 1],
-                            [1, 0, 1, 1, 1, 0, 1],
-                            [1, 0, 0, 0, 0, 0, 1],
-                            [1, 1, 1, 1, 1, 1, 1]])
-    elif MAZE_NUM == 2:
-        # #2
-        mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
-                            [1, 0, 0, 0, 0, 0, 1],
-                            [1, 1, 1, 1, 1, 0, 2],
-                            [1, 0, 0, 0, 1, 0, 1],
-                            [1, 0, 1, 1, 1, 0, 1],
-                            [1, 0, 0, 0, 0, 0, 1],
-                            [1, 1, 1, 1, 1, 1, 1]])
-    elif MAZE_NUM == 3:
-        # #3
-        mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
-                            [1, 0, 1, 0, 0, 0, 1],
-                            [1, 0, 0, 0, 1, 0, 2],
-                            [1, 1, 1, 1, 1, 0, 1],
-                            [1, 0, 1, 1, 1, 0, 1],
-                            [1, 0, 0, 0, 0, 0, 1],
-                            [1, 1, 1, 1, 1, 1, 1]])
+    if not CUSTOM:
+        while True:
+            r = random.randint(1, rsize * 2)
+            if mazeMap[r][-2] == 1:
+                continue
+            mazeMap[r][-1] = 2
+            destY = r
+            destX = np.shape(mazeMap)[1] - 1
+            # print(destX, destY)
+            break
+    else:
+        if MAZE_NUM == 1:
+            mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                                [1, 0, 0, 0, 0, 0, 2],
+                                [1, 1, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 1, 0, 1],
+                                [1, 0, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 1, 1, 1, 1, 1]])
+        elif MAZE_NUM == 2:
+            mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                                [1, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 1, 1, 1, 0, 2],
+                                [1, 0, 0, 0, 1, 0, 1],
+                                [1, 0, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 1, 1, 1, 1, 1]])
+        elif MAZE_NUM == 3:
+            mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                                [1, 0, 1, 0, 0, 0, 1],
+                                [1, 0, 0, 0, 1, 0, 2],
+                                [1, 1, 1, 1, 1, 0, 1],
+                                [1, 0, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 1, 1, 1, 1, 1]])
+        elif MAZE_NUM == 4:
+            mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1],
+                                [1, 0, 1, 0, 0, 0, 1],
+                                [1, 0, 1, 0, 1, 0, 1],
+                                [1, 0, 0, 0, 1, 0, 1],
+                                [1, 1, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 2, 1, 1, 1, 1]])
+        elif MAZE_NUM == 5:
+            mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                                [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+                                [1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
+                                [1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1],
+                                [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+                                [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1],
+                                [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+                                [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2],
+                                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        elif MAZE_NUM == 6:
+            mazeMap = np.array([[1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                                [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+                                [1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1],
+                                [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1],
+                                [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 2],
+                                [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1],
+                                [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1],
+                                [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1],
+                                [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1],
+                                [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1],
+                                [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+                                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
 
 
 def reset_maze(acc_deg):
@@ -320,6 +366,7 @@ class DQN(tf.keras.Model):
 
         self.fc1 = Dense(16, activation='relu')
         self.fc2 = Dense(32, activation='relu')
+        # self.fc3 = Dense(32, activation='relu')
         self.dropout = Dropout(0.5)
         self.flatten = Flatten(input_shape=state_size)
         self.fc_out = Dense(action_size, activation='linear')
@@ -327,6 +374,7 @@ class DQN(tf.keras.Model):
     def call(self, x):
         x = self.fc1(x)
         x = self.fc2(x)
+        # x = self.fc3(x)
         x = self.dropout(x)
         x = self.flatten(x)
         q = self.fc_out(x)
@@ -352,7 +400,7 @@ class DQNAgent:
         self.epsilon_decay_step = 0.99
         self.max_step = 500
         self.batch_size = 32
-        self.train_start = 10000
+        self.train_start = 150000
         self.train_freq = 1
         self.update_target_rate = 500
 
@@ -478,7 +526,7 @@ def proceed():
 
     move_delay = 0.00
 
-    num_episode = 50000
+    num_episode = 1001
     for e in range(0, num_episode):
         reward = 0
         done = False
@@ -532,7 +580,8 @@ def proceed():
                 # 1) 이전에 방문했던 블럭 재방문 시
                 if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
                     # 중간보상 방식
-                    reward = -0.015
+                    # reward = -0.015
+                    reward = 0.01
                 #
                 #     # 에피소드 종료 방식
                 #     # reward = -1
@@ -668,14 +717,25 @@ mazeMap = []
 posX = 1
 posY = 0
 
-if MAZE_NUM == 1:
-    # 1
-    destX = 6
-    destY = 1
-elif MAZE_NUM == 2 or MAZE_NUM == 3:
-    # 2
-    destX = 6
-    destY = 2
+if CUSTOM:
+    if MAZE_NUM == 1:
+        destX = 6
+        destY = 1
+    elif MAZE_NUM == 2 or MAZE_NUM == 3:
+        destX = 6
+        destY = 2
+    elif MAZE_NUM == 4:
+        destX = 2
+        destY = 6
+    elif MAZE_NUM == 5:
+        destX = 10
+        destY = 9
+    elif MAZE_NUM == 6:
+        destX = 14
+        destY = 4
+else:
+    destX = 0
+    destY = 0
 
 tk = ''
 canvas = ''
