@@ -364,8 +364,8 @@ class DQN(tf.keras.Model):
     def __init__(self, action_size, state_size):
         super(DQN, self).__init__()
 
-        self.fc1 = Dense(32, activation='relu')
-        # self.fc2 = Dense(32, activation='relu')
+        self.fc1 = Dense(16, activation='relu')
+        self.fc2 = Dense(32, activation='relu')
         # self.fc3 = Dense(32, activation='relu')
         # self.dropout = Dropout(0.5)
         self.flatten = Flatten(input_shape=state_size)
@@ -373,7 +373,7 @@ class DQN(tf.keras.Model):
 
     def call(self, x):
         x = self.fc1(x)
-        # x = self.fc2(x)
+        x = self.fc2(x)
         # x = self.fc3(x)
         # x = self.dropout(x)
         x = self.flatten(x)
@@ -400,7 +400,7 @@ class DQNAgent:
         self.epsilon_decay_step = 0.99
         self.max_step = 500
         self.batch_size = 32
-        self.train_start = 70000
+        self.train_start = 500000
         self.train_freq = 1
         self.update_target_rate = 500
 
@@ -526,8 +526,8 @@ def proceed():
 
     move_delay = 0.00
 
-    num_episode = 1001
-    for e in range(0, num_episode):
+    num_episode = 1000
+    for e in range(1, num_episode+1):
         reward = 0
         done = False
 
@@ -580,8 +580,7 @@ def proceed():
                 # 1) 이전에 방문했던 블럭 재방문 시
                 if mazeMap[posY][posX] == 4 or mazeMap[posY][posX] == 3:
                     # 중간보상 방식
-                    # reward = -0.015
-                    reward = -0.01
+                    reward = -0.015
                 #
                 #     # 에피소드 종료 방식
                 #     # reward = -1
