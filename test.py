@@ -21,7 +21,7 @@ PLAY_MODE = 0
 GAME_SPEED = 1  # 1~10
 ROTATION_MODE = True  # 미로 회전 그래픽 출력
 ROTATE_DELAY = 0.2 / GAME_SPEED
-MOVE_DELAY = 0.2 / GAME_SPEED
+MOVE_DELAY = 0.1 / GAME_SPEED
 USE_MAX_STEP = False
 
 # (학습 시작 step / 타겟 네트워크 업데이트 step / 행동 네트워크 업데이트 step / 학습 시작 ep / 최적 step / Layer / dropout 유무)
@@ -45,13 +45,14 @@ USE_MAX_STEP = False
 # 5_5 (70000 / 500 / 1 / 46 / 38 / 32 / x) : x
 
 # 5_com3 (500000 / 500 / 1 / 337 / 38 / 16, 32 / x) : 970(38)
-
 # 5_com4 (500000 / 500 / 1 /  / 38 / 32, 64 / o) :
 
+# 6_com4 (500000 / 500 / 1 / - / 59 / 32, 64 / o) : 5000(59)
+
 CUSTOM = True
-MAZE_NUM = 4  # 미로 종류
-SUB_NUM = '1'  # 미로별 학습 폴더 번호
-EP_NUM = 197  # 불러올 모델의 학습 에피소드 번호
+MAZE_NUM = 5  # 미로 종류
+SUB_NUM = 'com3'  # 미로별 학습 폴더 번호
+EP_NUM = 970  # 불러올 모델의 학습 에피소드 번호
 
 # 미로 크기 설정(홀수)
 if MAZE_NUM <= 4:
