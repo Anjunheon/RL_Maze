@@ -24,7 +24,8 @@ ROTATE_DELAY = 0.0 / GAME_SPEED
 MOVE_DELAY = 0.0 / GAME_SPEED
 USE_MAX_STEP = False
 
-CUSTOM = True
+CUSTOM = False
+RANDOM_MAZE = True
 MAZE_NUM = 5  # 미로 종류
 
 # 미로 크기 설정(홀수)
@@ -183,29 +184,47 @@ def reset_maze(acc_deg):
     posX = 1
     posY = 0
 
-    if acc_deg == 0:
-        mazeMap = np.array(mazeMap)
-    elif 360 - acc_deg == 90:
-        mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
-    elif 360 - acc_deg == 180:
-        mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
-        mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
-    elif 360 - acc_deg == 270:
-        mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
+    if not RANDOM_MAZE:
+        if acc_deg == 0:
+            mazeMap = np.array(mazeMap)
+        elif 360 - acc_deg == 90:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+        elif 360 - acc_deg == 180:
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+            mazeMap = np.array(list(map(list, zip(*mazeMap[::-1]))))
+        elif 360 - acc_deg == 270:
+            mazeMap = np.array(list(map(list, zip(*mazeMap)))[::-1])
+
+        visited = np.where(np.array(mazeMap) == 4)
+        for i in range(0, len(visited[0])):
+            mazeMap[visited[0][i]][visited[1][i]] = 0
+    else:
+        make_maze()
+
+        canvas.delete('all')
+
+        for i, r in enumerate(mazeMap):
+            for j, c in enumerate(r):
+                if mazeMap[i][j] == 1:
+                    canvas.create_rectangle(j * 50, i * 50, j * 50 + 50, i * 50 + 50, fill='#D2D0D1', outline='#D2D0D1',
+                                            width='3')
+                elif mazeMap[i][j] == 2:
+                    dest.place(x=j * 50 + 5, y=i * 50 + 5)
+                    dest.configure()
 
     mazeMap[posY][posX] = 3
-
-    visited = np.where(np.array(mazeMap) == 4)
-    for i in range(0, len(visited[0])):
-        mazeMap[visited[0][i]][visited[1][i]] = 0
-
     mazeMap[destY][destX] = 2
 
-    g_rotate_maze(acc_deg)
-    g_move_ball(acc_deg)
+    if not RANDOM_MAZE:
+        g_rotate_maze(acc_deg)
+        g_move_ball(acc_deg)
 
     done = False
 
+    dest.place(x=j * 50 + 5, y=i * 50 + 5)
+    dest.configure()
+
+    canvas.pack()
     tk.update()
 
 
